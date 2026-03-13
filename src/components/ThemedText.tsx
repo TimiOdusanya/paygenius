@@ -1,10 +1,10 @@
-import React from 'react';
-import { Text, TextProps } from 'react-native';
-import { useTheme } from '../context/ThemeContext';
+import React from "react";
+import { Text, TextProps } from "react-native";
+import { useTheme } from "@/context/ThemeContext";
 
 type ThemedTextProps = TextProps & {
   /** 'primary' = main text, 'secondary' = de-emphasized, 'muted' = hint, 'inverse' = on dark bg */
-  variant?: 'primary' | 'secondary' | 'muted' | 'inverse';
+  variant?: "primary" | "secondary" | "muted" | "inverse";
 };
 
 /**
@@ -12,17 +12,19 @@ type ThemedTextProps = TextProps & {
  */
 export function ThemedText({
   style,
-  variant = 'primary',
+  variant = "primary",
   ...props
 }: ThemedTextProps) {
   const { colors } = useTheme();
   const color =
-    variant === 'secondary'
+    variant === "secondary"
       ? colors.textSecondary
-      : variant === 'muted'
+      : variant === "muted"
         ? colors.textMuted
-        : variant === 'inverse'
+        : variant === "inverse"
           ? colors.textInverse
           : colors.text;
-  return <Text style={[{ color } as Record<string, unknown>, style]} {...props} />;
+  return (
+    <Text style={[{ color } as Record<string, unknown>, style]} {...props} />
+  );
 }

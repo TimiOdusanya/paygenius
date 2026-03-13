@@ -1,6 +1,7 @@
-import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
-import type { User } from '../types';
-import { api, getAuthToken, setAuthToken } from '../services/api';
+import React, { createContext, useCallback, useContext, useMemo } from "react";
+import type { User } from "@/types";
+import { useAuthStore } from "@/stores/auth.store";
+import { useGetMeQuery, useLoginMutation } from "@/services/auth/auth.query";
 
 type AuthContextValue = {
   user: User | null;
@@ -10,83 +11,43 @@ type AuthContextValue = {
   login: (phone: string, password: string) => Promise<void>;
   logout: () => void;
   setUser: (user: User | null) => void;
-  refreshUser: () => Promise<void>;
+  refreshUser: () => void;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUserState] = useState<User | null>(null);
-  const [token, setTokenState] = useState<string | null>(() => getAuthToken());
-  const [isLoading, setIsLoading] = useState(true);
+  const { token, user, setAuth, setUser, clearAuth } = useAuthStore();
 
-  const setUser = useCallback((u: User | null) => {
-    setUserState(u);
-  }, []);
+  const { refetch: refetchMe, isFetching: isMeLoading } = useGetMeQuery({
+    enabled: !!token,
+    retry: false,
+  });
 
-  const refreshUser = useCallback(async () => {
-    const t = getAuthToken();
-    if (!t) {
-      setUserState(null);
-      return;
-    }
-    try {
-      const res = await api.auth.me();
-      if (res.success && res.data?.user) {
-        setUserState(res.data.user);
-      }
-    } catch {
-      setAuthToken(null);
-      setTokenState(null);
-      setUserState(null);
-    }
-  }, []);
+  const loginMutation = useLoginMutation();
 
-  React.useEffect(() => {
-    let cancelled = false;
-    const t = getAuthToken();
-    if (!t) {
-      setIsLoading(false);
-      return;
-    }
-    setTokenState(t);
-    api.auth
-      .me()
-      .then((res) => {
-        if (!cancelled && res.success && res.data?.user) {
-          setUserState(res.data.user);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setAuthToken(null);
-          setTokenState(null);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setIsLoading(false);
+  const login = useCallback(
+    async (phone: string, password: string) => {
+      const res = await loginMutation.mutateAsync({
+        phoneNumber: phone,
+        password,
       });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const login = useCallback(async (phone: string, password: string) => {
-    const res = await api.auth.login({ phoneNumber: phone, password });
-    if (!res.success || !res.data?.token) {
-      throw new Error((res as { message?: string }).message ?? 'Login failed');
-    }
-    const { token: newToken, user: newUser } = res.data;
-    setAuthToken(newToken);
-    setTokenState(newToken);
-    setUserState(newUser);
-  }, []);
+      if (!res.success || !res.data?.token) {
+        throw new Error(res.message ?? "Login failed");
+      }
+    },
+    [loginMutation],
+  );
 
   const logout = useCallback(() => {
-    setAuthToken(null);
-    setTokenState(null);
-    setUserState(null);
-  }, []);
+    clearAuth();
+  }, [clearAuth]);
+
+  const refreshUser = useCallback(() => {
+    if (token) refetchMe();
+  }, [token, refetchMe]);
+
+  const isLoading = !!token && (!user || isMeLoading);
 
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -96,10 +57,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isAuthenticated: !!token && !!user,
       login,
       logout,
-      setUser: setUserState,
+      setUser,
       refreshUser,
     }),
-    [user, token, isLoading, login, logout, refreshUser]
+    [user, token, isLoading, login, logout, setUser, refreshUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -108,7 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 export function useAuth(): AuthContextValue {
   const ctx = useContext(AuthContext);
   if (!ctx) {
-    throw new Error('useAuth must be used within AuthProvider');
+    throw new Error("useAuth must be used within AuthProvider");
   }
   return ctx;
 }

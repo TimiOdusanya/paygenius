@@ -1,0 +1,39 @@
+---
+description: PayGenius code standards — file size and structure
+globs: **/*.{ts,tsx}
+---
+
+# Code standards
+
+## File size limit
+
+- **No component or screen file may exceed 350 lines of code.**
+- If a file grows beyond 350 lines, split it by:
+  - Moving screen-specific UI into a subfolder (e.g. `screens/Splash/SplashLetter.tsx`).
+  - Extracting styles into a `*.styles.ts` file.
+  - Extracting constants into a `constants.ts` file.
+  - Extracting subcomponents into their own files in the same feature folder.
+
+## Screens folder structure
+
+Each screen lives in its own folder under `src/screens/`:
+
+```
+screens/
+├── Splash/
+│   ├── SplashScreen.tsx    # Main screen component
+│   ├── SplashLetter.tsx    # Screen-specific subcomponents
+│   ├── splashScreen.styles.ts
+│   ├── constants.ts        # Screen-specific constants
+│   └── index.ts            # export { SplashScreen }
+├── Home/
+│   ├── HomeScreen.tsx
+│   └── index.ts
+├── Login/
+│   ├── LoginScreen.tsx
+│   └── index.ts
+└── index.ts                # Re-export all screens
+```
+
+- One folder per screen; screen name in PascalCase (e.g. `Splash`, `Home`).
+- Export the main screen from the folder’s `index.ts`; root `screens/index.ts` re-exports for navigation.

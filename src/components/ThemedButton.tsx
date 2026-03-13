@@ -1,17 +1,17 @@
-import React from 'react';
+import React from "react";
 import {
   Pressable,
   PressableProps,
   StyleSheet,
   Text,
   ViewStyle,
-} from 'react-native';
-import { useTheme } from '../context/ThemeContext';
+} from "react-native";
+import { useTheme } from "@/context/ThemeContext";
 
 type ThemedButtonProps = PressableProps & {
   title: string;
-  variant?: 'primary' | 'secondary' | 'outline';
-  size?: 'medium' | 'small';
+  variant?: "primary" | "secondary" | "outline";
+  size?: "medium" | "small";
 };
 
 /**
@@ -19,32 +19,32 @@ type ThemedButtonProps = PressableProps & {
  */
 export function ThemedButton({
   title,
-  variant = 'primary',
-  size = 'medium',
+  variant = "primary",
+  size = "medium",
   style,
   ...props
 }: ThemedButtonProps) {
   const { colors } = useTheme();
 
   const bg =
-    variant === 'primary'
+    variant === "primary"
       ? colors.primary
-      : variant === 'secondary'
+      : variant === "secondary"
         ? colors.secondary
-        : 'transparent';
-  const borderColor = variant === 'outline' ? colors.border : 'transparent';
+        : "transparent";
+  const borderColor = variant === "outline" ? colors.border : "transparent";
   const textColor =
-    variant === 'outline' ? colors.text : colors.primaryContrast;
+    variant === "outline" ? colors.text : colors.primaryContrast;
 
   const buttonStyle: ViewStyle = {
     backgroundColor: bg,
-    borderWidth: variant === 'outline' ? 1 : 0,
+    borderWidth: variant === "outline" ? 1 : 0,
     borderColor,
-    paddingVertical: size === 'small' ? 8 : 12,
-    paddingHorizontal: size === 'small' ? 14 : 20,
+    paddingVertical: size === "small" ? 8 : 12,
+    paddingHorizontal: size === "small" ? 14 : 20,
     borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   };
 
   return (
@@ -59,8 +59,8 @@ export function ThemedButton({
       <Text
         style={{
           color: textColor,
-          fontSize: size === 'small' ? 14 : 16,
-          fontWeight: '600',
+          fontSize: size === "small" ? 14 : 16,
+          fontWeight: "600",
         }}
       >
         {title}
