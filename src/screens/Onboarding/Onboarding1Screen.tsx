@@ -22,6 +22,8 @@ import {
   DESC_COLOR_DARK,
   SKIP_COLOR_DARK,
   HIGHLIGHT_PURPLE,
+  IMAGE_WIDTH_INSET,
+  IMAGE_HEIGHT_RATIO,
 } from "./onboarding.styles";
 
 import Splash1Svg from "../../../assets/images/onboarding/splash-1.svg";
@@ -32,6 +34,8 @@ export function Onboarding1Screen({ navigation }: Props) {
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const { isDark } = useTheme();
+  const imageWidth = width - IMAGE_WIDTH_INSET;
+  const imageHeight = imageWidth * IMAGE_HEIGHT_RATIO;
 
   const goToRegion = () => navigation.replace("RegionSelector");
 
@@ -59,7 +63,7 @@ export function Onboarding1Screen({ navigation }: Props) {
         style={onboardingStyles.headerWrap}
       />
       <View style={onboardingStyles.imageSection}>
-        <Splash1Svg width={width - 48} height={(width - 48) * 0.95} />
+        <Splash1Svg width={imageWidth} height={imageHeight} />
       </View>
       <View style={onboardingStyles.dotsWrap}>
         <StepDots currentStep={1} />

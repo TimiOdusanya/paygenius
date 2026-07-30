@@ -16,6 +16,16 @@ export const SKIP_COLOR_DARK = "#FFFFFF";
 export const HIGHLIGHT_PURPLE = "#7C3AED";
 export const HIGHLIGHT_GREEN = "#10B981";
 
+/**
+ * Figma (402×874): Skip/Back ~y83–89, illustrations ~y234–255.
+ * Keep clear space under the header so art does not collide with controls.
+ */
+export const IMAGE_SECTION_TOP = 48;
+/** Illustration width inset from screen edges (paddingHorizontal 24 × 2). */
+export const IMAGE_WIDTH_INSET = 48;
+/** Height as a fraction of illustration width — keeps art from eating header space. */
+export const IMAGE_HEIGHT_RATIO = 0.78;
+
 export const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -23,12 +33,15 @@ export const styles = StyleSheet.create({
   },
   headerWrap: {
     paddingTop: 8,
+    zIndex: 1,
   },
   imageSection: {
     flex: 1,
     width: "100%",
     alignItems: "center",
     justifyContent: "center",
+    paddingTop: IMAGE_SECTION_TOP,
+    minHeight: 0,
   },
   imageWrap: {
     alignItems: "center",
@@ -39,15 +52,17 @@ export const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 12,
-    marginTop: 24,
+    marginTop: 16,
+    marginBottom: 4,
   },
   content: {
-    flex: 1,
+    flexGrow: 0,
+    flexShrink: 0,
   },
   title: {
     fontSize: 24,
     fontWeight: "600",
-    marginTop: 24,
+    marginTop: 16,
     textAlign: "left",
   },
   description: {
@@ -58,6 +73,7 @@ export const styles = StyleSheet.create({
     lineHeight: 24,
   },
   buttonWrap: {
+    paddingTop: 16,
     paddingBottom: 32,
   },
 });

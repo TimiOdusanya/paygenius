@@ -1,11 +1,7 @@
 import React from "react";
-import { View, Text, StyleSheet, Pressable, ViewStyle } from "react-native";
-import Ionicons from "@expo/vector-icons/Ionicons";
+import { View, Text, StyleSheet, ViewStyle } from "react-native";
 import { useTheme } from "@/context/ThemeContext";
-
-const BACK_BG = "rgba(192, 192, 241, 0.3)";
-const BACK_ICON_COLOR = "#949494";
-const BACK_ICON_SIZE = 12;
+import { BackButton } from "@/components/BackButton";
 
 export type HeaderTitleAlign = "left" | "center";
 export type HeaderDescriptionAlign = "left" | "center";
@@ -40,22 +36,9 @@ export function Header({
 
   return (
     <View style={[styles.wrap, style]}>
-      {/* Top row: optional back (left), spacer, optional right */}
       <View style={styles.topRow}>
         {onBack ? (
-          <Pressable
-            onPress={onBack}
-            style={({ pressed }) => [
-              styles.backDiv,
-              pressed && styles.backPressed,
-            ]}
-          >
-            <Ionicons
-              name="chevron-back"
-              size={BACK_ICON_SIZE}
-              color={BACK_ICON_COLOR}
-            />
-          </Pressable>
+          <BackButton onPress={onBack} size={32} />
         ) : (
           <View style={styles.backPlaceholder} />
         )}
@@ -67,7 +50,6 @@ export function Header({
         )}
       </View>
 
-      {/* Heading */}
       {title != null && title !== "" ? (
         <Text
           style={[
@@ -80,7 +62,6 @@ export function Header({
         </Text>
       ) : null}
 
-      {/* Description */}
       {description != null && description !== "" ? (
         <Text
           style={[
@@ -107,17 +88,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     width: "100%",
-  },
-  backDiv: {
-    backgroundColor: BACK_BG,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  backPressed: {
-    opacity: 0.8,
   },
   backPlaceholder: {
     width: 32,

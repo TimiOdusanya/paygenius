@@ -1,11 +1,4 @@
-import type { User, Address } from '@/types';
-
-export interface ApiResponse<T> {
-  success: boolean;
-  message: string;
-  data?: T;
-  error?: string;
-}
+import type { User } from '@/types';
 
 export interface ProfileResponse {
   user: User;

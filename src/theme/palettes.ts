@@ -78,7 +78,7 @@ export const blackPalette: Record<string, string> = {
 export const bluePalette: Record<string, string> = {
   '0': '#C0C0F1',
   '0.5': '#AFAFE4',
-  '1': '#9F9FD7',
+  '1': '#8F9FD7',
   '1.5': '#8E8ECA',
   '2': '#7D7DBD',
   '3': '#5C5CA4',

@@ -1,14 +1,13 @@
 import { paygeniusAPI } from '../api/http';
 import { PROFILE_ENDPOINTS } from './profile.endpoints';
+import type { Address, ApiResponse } from '@/types';
 import type {
-  ApiResponse,
   ProfileResponse,
   ProfileSetupPayload,
   VerifyIdentityPayload,
   UploadSelfiePayload,
   SetupPinPayload,
 } from './profile.type';
-import type { Address } from '@/types';
 
 export const getProfileAPI = async (): Promise<ApiResponse<ProfileResponse>> => {
   const response = await paygeniusAPI.get<ApiResponse<ProfileResponse>>(

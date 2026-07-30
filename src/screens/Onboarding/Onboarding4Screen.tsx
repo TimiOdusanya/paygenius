@@ -21,6 +21,8 @@ import {
   DESC_COLOR_LIGHT,
   DESC_COLOR_DARK,
   SKIP_COLOR_DARK,
+  IMAGE_WIDTH_INSET,
+  IMAGE_HEIGHT_RATIO,
 } from "./onboarding.styles";
 
 import Splash4Svg from "../../../assets/images/onboarding/splash-4.svg";
@@ -31,6 +33,8 @@ export function Onboarding4Screen({ navigation }: Props) {
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const { isDark } = useTheme();
+  const imageWidth = width - IMAGE_WIDTH_INSET;
+  const imageHeight = imageWidth * IMAGE_HEIGHT_RATIO;
 
   const goToRegion = () => navigation.replace("RegionSelector");
   const goBack = () => navigation.replace("Onboarding3");
@@ -60,7 +64,7 @@ export function Onboarding4Screen({ navigation }: Props) {
         style={onboardingStyles.headerWrap}
       />
       <View style={onboardingStyles.imageSection}>
-        <Splash4Svg width={width - 48} height={(width - 48) * 0.95} />
+        <Splash4Svg width={imageWidth} height={imageHeight} />
       </View>
       <View style={onboardingStyles.dotsWrap}>
         <StepDots currentStep={4} />

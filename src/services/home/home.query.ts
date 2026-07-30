@@ -1,8 +1,9 @@
 import { useQuery, type UseQueryOptions } from '@tanstack/react-query';
 import type { AxiosError } from 'axios';
+import type { ApiResponse } from '@/types';
 import { HOME_ENDPOINTS } from './home.endpoints';
 import { getDashboardAPI } from './home.api';
-import type { ApiResponse, HomeDashboardData } from './home.type';
+import type { HomeDashboardData } from './home.type';
 
 export function useGetDashboardQuery(
   options?: Omit<

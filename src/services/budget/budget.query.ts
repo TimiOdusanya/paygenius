@@ -5,10 +5,10 @@ import {
   type UseQueryOptions,
 } from '@tanstack/react-query';
 import type { AxiosError } from 'axios';
+import type { ApiResponse } from '@/types';
 import { BUDGET_ENDPOINTS } from './budget.endpoints';
 import { getBudgetsAPI, createBudgetAPI } from './budget.api';
 import type {
-  ApiResponse,
   BudgetListResponse,
   CreateBudgetResponse,
   CreateBudgetPayload,

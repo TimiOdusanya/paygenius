@@ -1,7 +1,7 @@
 import { paygeniusAPI } from '../api/http';
 import { BUDGET_ENDPOINTS } from './budget.endpoints';
+import type { ApiResponse } from '@/types';
 import type {
-  ApiResponse,
   BudgetListResponse,
   CreateBudgetResponse,
   CreateBudgetPayload,

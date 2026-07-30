@@ -5,6 +5,7 @@ import {
   type UseQueryOptions,
 } from '@tanstack/react-query';
 import type { AxiosError } from 'axios';
+import type { Address, ApiResponse } from '@/types';
 import { PROFILE_ENDPOINTS } from './profile.endpoints';
 import {
   getProfileAPI,
@@ -16,14 +17,12 @@ import {
   enableBiometricAPI,
 } from './profile.api';
 import type {
-  ApiResponse,
   ProfileResponse,
   ProfileSetupPayload,
   VerifyIdentityPayload,
   UploadSelfiePayload,
   SetupPinPayload,
 } from './profile.type';
-import type { Address } from '@/types';
 
 export function useGetProfileQuery(
   options?: Omit<

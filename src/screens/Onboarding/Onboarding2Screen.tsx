@@ -22,6 +22,8 @@ import {
   DESC_COLOR_DARK,
   SKIP_COLOR_DARK,
   HIGHLIGHT_PURPLE,
+  IMAGE_WIDTH_INSET,
+  IMAGE_HEIGHT_RATIO,
 } from "./onboarding.styles";
 
 import PaygenieSvg from "../../../assets/images/onboarding/paygenie.svg";
@@ -33,6 +35,8 @@ export function Onboarding2Screen({ navigation }: Props) {
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const { isDark } = useTheme();
+  const imageWidth = width - IMAGE_WIDTH_INSET;
+  const imageHeight = imageWidth * IMAGE_HEIGHT_RATIO;
 
   const goToRegion = () => navigation.replace("RegionSelector");
   const goBack = () => navigation.replace("Onboarding1");
@@ -63,10 +67,10 @@ export function Onboarding2Screen({ navigation }: Props) {
       />
       <View style={onboardingStyles.imageSection}>
         <View style={onboardingStyles.imageWrap}>
-          <PaygenieSvg width={(width - 48) * 0.85} height={72} />
+          <PaygenieSvg width={imageWidth * 0.55} height={48} />
         </View>
-        <View style={[onboardingStyles.imageWrap, { marginTop: 16 }]}>
-          <Splash2Svg width={width - 48} height={(width - 48) * 0.95} />
+        <View style={[onboardingStyles.imageWrap, { marginTop: 12 }]}>
+          <Splash2Svg width={imageWidth * 0.72} height={imageHeight * 0.85} />
         </View>
       </View>
       <View style={onboardingStyles.dotsWrap}>

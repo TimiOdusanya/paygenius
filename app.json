@@ -25,6 +25,24 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "scheme": "paygenius",
+    "plugins": [
+      "@react-native-community/datetimepicker",
+      "expo-apple-authentication",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow PayGenius to access your camera for selfie verification."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow PayGenius to access your photos."
+        }
+      ],
+      "expo-web-browser"
+    ]
   }
 }
