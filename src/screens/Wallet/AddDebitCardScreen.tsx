@@ -148,6 +148,7 @@ export function AddDebitCardScreen({ navigation }: Props) {
               Add a bank account that's linked to your BVN
             </Text>
           </View>
+          <View style={{ width: 22 }} />
         </View>
 
         <ScrollView

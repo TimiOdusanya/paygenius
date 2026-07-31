@@ -1,24 +1,46 @@
 import { create } from 'zustand';
+import { createJSONStorage, persist } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { User } from '@/types';
 
 type AuthState = {
   token: string | null;
   user: User | null;
+  hasHydrated: boolean;
   setAuth: (token: string, user: User) => void;
   setUser: (user: User | null) => void;
   clearAuth: () => void;
   isAuthenticated: () => boolean;
+  setHasHydrated: (value: boolean) => void;
 };
 
-export const useAuthStore = create<AuthState>((set, get) => ({
-  token: null,
-  user: null,
+export const useAuthStore = create<AuthState>()(
+  persist(
+    (set, get) => ({
+      token: null,
+      user: null,
+      hasHydrated: false,
 
-  setAuth: (token, user) => set({ token, user }),
+      setAuth: (token, user) => set({ token, user }),
 
-  setUser: (user) => set({ user }),
+      setUser: (user) => set({ user }),
 
-  clearAuth: () => set({ token: null, user: null }),
+      clearAuth: () => set({ token: null, user: null }),
 
-  isAuthenticated: () => !!get().token,
-}));
+      isAuthenticated: () => !!get().token,
+
+      setHasHydrated: (hasHydrated) => set({ hasHydrated }),
+    }),
+    {
+      name: 'paygenius-auth',
+      storage: createJSONStorage(() => AsyncStorage),
+      partialize: (state) => ({
+        token: state.token,
+        user: state.user,
+      }),
+      onRehydrateStorage: () => () => {
+        useAuthStore.setState({ hasHydrated: true });
+      },
+    }
+  )
+);

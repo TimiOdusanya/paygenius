@@ -44,9 +44,10 @@ export const registerAPI = async (
 };
 
 export const loginAPI = async (data: LoginPayload): Promise<ApiResponse<AuthData>> => {
+  // Send as `identifier` so the backend can accept phone / email / username
   const response = await paygeniusAPI.post<ApiResponse<AuthData>>(
     AUTH_ENDPOINTS.LOGIN.ROUTE,
-    data
+    { identifier: data.identifier, password: data.password }
   );
   const res = response.data;
   if (res.success && res.data) {

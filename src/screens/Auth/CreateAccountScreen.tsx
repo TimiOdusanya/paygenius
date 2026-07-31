@@ -15,9 +15,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/RootNavigator';
 import { PrimaryButton } from '@/components/PrimaryButton';
-import { BackButton } from '@/components/BackButton';
+import { Header } from '@/components/Header';
 import { useTheme } from '@/context/ThemeContext';
 import { useResponsive } from '@/hooks/useResponsive';
+import { useTrackOnboardingRoute } from '@/hooks/useTrackOnboardingRoute';
 import { useGoogleAuth } from '@/hooks/useGoogleAuth';
 import { signInWithApple, isAppleSignInAvailable } from '@/hooks/useAppleAuth';
 import {
@@ -25,12 +26,16 @@ import {
   useGoogleCodeMutation,
   useAppleAuthMutation,
 } from '@/services/auth/auth.query';
+import { navigateAfterAuth } from '@/navigation/navigateAfterAuth';
+import { usePreferencesStore } from '@/stores/preferences.store';
+import { getApiErrorMessage } from '@/utils/errors';
 import GoogleLogo from '../../../assets/images/auth/google-logo.svg';
 import AppleLogo from '../../../assets/images/auth/apple-logo.svg';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CreateAccount'>;
 
 export function CreateAccountScreen({ navigation }: Props) {
+  useTrackOnboardingRoute('CreateAccount');
   const insets = useSafeAreaInsets();
   const { isDark } = useTheme();
   const { hs, vs, fs, ms } = useResponsive();
@@ -40,7 +45,6 @@ export function CreateAccountScreen({ navigation }: Props) {
 
   const bg = isDark ? '#1A1A1A' : '#FAFAFC';
   const titleColor = isDark ? '#FFFFFF' : '#191970';
-  const subtitleColor = isDark ? '#CCCCCC' : '#858585';
   const inputBg = isDark ? '#1E1E2E' : '#FAFAFC';
   const inputBorderColor = isDark ? '#3B3B3B' : '#191970';
   const labelColor = isDark ? '#CCCCCC' : '#1A1D23';
@@ -70,11 +74,16 @@ export function CreateAccountScreen({ navigation }: Props) {
       { phoneNumber: fullPhoneNumber },
       {
         onSuccess: () => {
+          usePreferencesStore
+            .getState()
+            .setRegistrationProgress(fullPhoneNumber, 'OTPVerification');
           navigation.navigate('OTPVerification', { phoneNumber: fullPhoneNumber });
         },
-        onError: (err: any) => {
-          const msg = err?.response?.data?.message ?? 'Failed to send verification code.';
-          Alert.alert('Error', msg);
+        onError: (err) => {
+          Alert.alert(
+            'Error',
+            getApiErrorMessage(err, 'Failed to send verification code. Please try again.')
+          );
         },
       }
     );
@@ -91,9 +100,12 @@ export function CreateAccountScreen({ navigation }: Props) {
       googleCodeMutation.mutate(
         { code: result.code, redirectUri: result.redirectUri },
         {
-          onSuccess: () => navigation.replace('Main'),
-          onError: (err: any) => {
-            Alert.alert('Error', err?.response?.data?.message ?? 'Google authentication failed.');
+          onSuccess: () => navigateAfterAuth(navigation),
+          onError: (err) => {
+            Alert.alert(
+              'Error',
+              getApiErrorMessage(err, 'Google authentication failed. Please try again.')
+            );
           },
         }
       );
@@ -119,9 +131,12 @@ export function CreateAccountScreen({ navigation }: Props) {
     appleAuthMutation.mutate(
       { identityToken: result.identityToken, fullName: result.fullName },
       {
-        onSuccess: () => navigation.replace('Main'),
-        onError: (err: any) => {
-          Alert.alert('Error', err?.response?.data?.message ?? 'Apple authentication failed.');
+        onSuccess: () => navigateAfterAuth(navigation),
+        onError: (err) => {
+          Alert.alert(
+            'Error',
+            getApiErrorMessage(err, 'Apple authentication failed. Please try again.')
+          );
         },
       }
     );
@@ -145,19 +160,12 @@ export function CreateAccountScreen({ navigation }: Props) {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* Back */}
         <View style={{ paddingHorizontal: hs(21) }}>
-          <BackButton onPress={() => navigation.goBack()} />
-        </View>
-
-        {/* Title */}
-        <View style={[styles.titleBlock, { paddingHorizontal: hs(21), marginTop: vs(8) }]}>
-          <Text style={[styles.title, { color: titleColor, fontSize: fs(16), letterSpacing: -0.32 }]}>
-            Create an account
-          </Text>
-          <Text style={[styles.subtitle, { color: subtitleColor, fontSize: fs(12), marginTop: vs(4) }]}>
-            Choose sign up method
-          </Text>
+          <Header
+            onBack={() => navigation.goBack()}
+            title="Create an account"
+            description="Choose sign up method"
+          />
         </View>
 
         {/* Phone number field */}
@@ -297,10 +305,6 @@ export function CreateAccountScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   scroll: { flexGrow: 1 },
-  backBtn: { height: 32, justifyContent: 'center', alignItems: 'flex-start' },
-  titleBlock: {},
-  title: { fontWeight: '600' },
-  subtitle: { fontWeight: '400' },
   fieldGroup: {},
   fieldLabel: { fontWeight: '400' },
   phoneRow: { flexDirection: 'row', alignItems: 'center' },

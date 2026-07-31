@@ -10,10 +10,13 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/RootNavigator';
 import { useTheme } from '@/context/ThemeContext';
 import { useResponsive } from '@/hooks/useResponsive';
+import { useTrackOnboardingRoute } from '@/hooks/useTrackOnboardingRoute';
+import { usePreferencesStore } from '@/stores/preferences.store';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AccountCreated'>;
 
 export function AccountCreatedScreen({ navigation }: Props) {
+  useTrackOnboardingRoute('AccountCreated');
   const insets = useSafeAreaInsets();
   const { isDark } = useTheme();
   const { vs, fs, ms } = useResponsive();
@@ -27,6 +30,7 @@ export function AccountCreatedScreen({ navigation }: Props) {
 
   useEffect(() => {
     const timer = setTimeout(() => {
+      usePreferencesStore.getState().markOnboardingFinished();
       navigation.replace('Main');
     }, 3000);
     return () => clearTimeout(timer);

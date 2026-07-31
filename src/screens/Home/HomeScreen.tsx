@@ -7,6 +7,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/context/ThemeContext';
@@ -240,12 +241,12 @@ export function HomeScreen({ navigation }: Props) {
         {/* Balance Card */}
         <View style={{ paddingHorizontal: hs(21), marginTop: -vs(80) }}>
           <View style={[styles.balanceCard, { borderRadius: ms(10), overflow: 'hidden', height: vs(152) }]}>
-            <View style={[styles.balanceGradient, {
-              backgroundColor: '#191970',
-              position: 'absolute',
-              top: 0, left: 0, right: 0, bottom: 0,
-              borderRadius: ms(10),
-            }]} />
+            <LinearGradient
+              colors={['#191970', '#3A2A8A']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
             <View style={[styles.accountRow, { paddingTop: vs(14), paddingHorizontal: hs(14) }]}>
               <Text style={[styles.accountId, { color: 'rgba(255,255,255,0.7)', fontSize: fs(10), letterSpacing: 0.4 }]}>
                 {accountNumber}

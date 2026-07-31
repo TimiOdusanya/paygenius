@@ -1,40 +1,56 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
+  FlatList,
+  Modal,
   Pressable,
   StyleSheet,
+  Text,
   TextInput,
   TextInputProps,
   View,
   ViewStyle,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import SelectChevron from '../../assets/images/kyc/select-chevron.svg';
 import { useTheme } from '@/context/ThemeContext';
 import { useResponsive } from '@/hooks/useResponsive';
 
-type FormInputProps = TextInputProps & {
+function useFormFieldTheme() {
+  const { isDark } = useTheme();
+  return {
+    isDark,
+    borderColor: isDark ? '#3B3B3B' : '#191970',
+    inputBg: isDark ? '#2A2A2A' : '#FAFAFC',
+    labelColor: isDark ? '#CCCCCC' : '#000000',
+    textColor: isDark ? '#FFFFFF' : '#1A1D23',
+    placeholderColor: 'rgba(133,133,133,0.6)',
+    sheetBg: isDark ? '#1E1E2E' : '#FFFFFF',
+    chevronColor: isDark ? '#FFFFFF' : '#1A1D23',
+    selectedOptionBg: isDark ? '#2E1A5E' : '#F0EAFB',
+    titleColor: isDark ? '#FFFFFF' : '#191970',
+  };
+}
+
+type FormFieldShellProps = {
   label: string;
   containerStyle?: ViewStyle;
-  rightIcon?: React.ReactNode;
+  children: React.ReactNode;
+  disabled?: boolean;
 };
 
-export function FormInput({
+/** Shared label + bordered field chrome used by text and select inputs. */
+function FormFieldShell({
   label,
   containerStyle,
-  rightIcon,
-  style,
-  ...props
-}: FormInputProps) {
-  const { isDark } = useTheme();
-  const { fs, vs, hs } = useResponsive();
-
-  const borderColor = isDark ? '#3B3B3B' : '#191970';
-  const inputBg = isDark ? '#2A2A2A' : '#FAFAFC';
-  const labelColor = isDark ? '#CCCCCC' : '#000000';
-  const textColor = isDark ? '#FFFFFF' : '#000000';
-  const placeholderColor = isDark ? 'rgba(133,133,133,0.6)' : 'rgba(133,133,133,0.6)';
+  children,
+  disabled = false,
+}: FormFieldShellProps) {
+  const { fs, vs } = useResponsive();
+  const { borderColor, inputBg, labelColor } = useFormFieldTheme();
 
   return (
-    <View style={[styles.container, containerStyle]}>
+    <View style={[styles.container, containerStyle, disabled && styles.disabled]}>
       <Text
         style={[
           styles.label,
@@ -53,32 +69,59 @@ export function FormInput({
           {
             backgroundColor: inputBg,
             borderColor,
-            borderWidth: 0.4,
-            borderRadius: 12,
             height: vs(44),
             marginTop: vs(5),
           },
         ]}
       >
-        <TextInput
-          style={[
-            styles.input,
-            {
-              color: textColor,
-              fontSize: fs(12),
-              paddingHorizontal: hs(16),
-              flex: 1,
-            },
-            style,
-          ]}
-          placeholderTextColor={placeholderColor}
-          {...props}
-        />
-        {rightIcon && (
-          <View style={styles.rightIconContainer}>{rightIcon}</View>
-        )}
+        {children}
       </View>
     </View>
+  );
+}
+
+type FormInputProps = TextInputProps & {
+  label: string;
+  containerStyle?: ViewStyle;
+  rightIcon?: React.ReactNode;
+};
+
+export function FormInput({
+  label,
+  containerStyle,
+  rightIcon,
+  style,
+  editable,
+  ...props
+}: FormInputProps) {
+  const { fs, hs } = useResponsive();
+  const { textColor, placeholderColor } = useFormFieldTheme();
+
+  return (
+    <FormFieldShell
+      label={label}
+      containerStyle={containerStyle}
+      disabled={editable === false}
+    >
+      <TextInput
+        style={[
+          styles.input,
+          {
+            color: textColor,
+            fontSize: fs(12),
+            paddingHorizontal: hs(16),
+            flex: 1,
+          },
+          style,
+        ]}
+        placeholderTextColor={placeholderColor}
+        editable={editable}
+        {...props}
+      />
+      {rightIcon ? (
+        <View style={styles.rightIconContainer}>{rightIcon}</View>
+      ) : null}
+    </FormFieldShell>
   );
 }
 
@@ -87,7 +130,6 @@ type PasswordInputProps = Omit<FormInputProps, 'rightIcon'>;
 export function PasswordInput({ style, ...props }: PasswordInputProps) {
   const [visible, setVisible] = useState(false);
   const { isDark } = useTheme();
-
   const eyeColor = isDark ? '#AAAAAA' : '#858585';
 
   return (
@@ -113,14 +155,205 @@ export function PasswordInput({ style, ...props }: PasswordInputProps) {
   );
 }
 
+export type SelectInputProps = {
+  label: string;
+  value: string;
+  placeholder?: string;
+  options: string[];
+  onSelect: (value: string) => void;
+  disabled?: boolean;
+  searchable?: boolean;
+  searchPlaceholder?: string;
+  containerStyle?: ViewStyle;
+  /** Override placeholder size (Figma LGA uses 10) */
+  placeholderFontSize?: number;
+};
+
+export function SelectInput({
+  label,
+  value,
+  placeholder = 'Select',
+  options,
+  onSelect,
+  disabled = false,
+  searchable = true,
+  searchPlaceholder = 'Search…',
+  containerStyle,
+  placeholderFontSize,
+}: SelectInputProps) {
+  const insets = useSafeAreaInsets();
+  const { fs, vs, hs, ms } = useResponsive();
+  const theme = useFormFieldTheme();
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+
+  const filtered = useMemo(() => {
+    const safe = options ?? [];
+    const q = query.trim().toLowerCase();
+    if (!q) return safe;
+    return safe.filter((opt) => opt.toLowerCase().includes(q));
+  }, [options, query]);
+
+  const displayFontSize = value ? fs(11) : fs(placeholderFontSize ?? 11);
+
+  return (
+    <>
+      <FormFieldShell
+        label={label}
+        containerStyle={containerStyle}
+        disabled={disabled}
+      >
+        <Pressable
+          disabled={disabled}
+          onPress={() => {
+            setQuery('');
+            setOpen(true);
+          }}
+          style={[styles.selectPressable, { paddingHorizontal: hs(16) }]}
+        >
+          <Text
+            numberOfLines={1}
+            style={[
+              styles.input,
+              {
+                color: value ? theme.textColor : theme.placeholderColor,
+                fontSize: displayFontSize,
+                flex: 1,
+                paddingRight: hs(8),
+              },
+            ]}
+          >
+            {value || placeholder}
+          </Text>
+          <SelectChevron width={9.5} height={4.5} color={theme.chevronColor} />
+        </Pressable>
+      </FormFieldShell>
+
+      <Modal
+        visible={open}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setOpen(false)}
+      >
+        <Pressable style={styles.backdrop} onPress={() => setOpen(false)}>
+          <Pressable
+            style={[
+              styles.sheet,
+              {
+                backgroundColor: theme.sheetBg,
+                paddingBottom: Math.max(insets.bottom, vs(16)),
+                maxHeight: '70%',
+              },
+            ]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={styles.handleWrap}>
+              <View
+                style={[
+                  styles.handle,
+                  { backgroundColor: theme.isDark ? '#555' : '#D0D0D0' },
+                ]}
+              />
+            </View>
+            <Text
+              style={[
+                styles.sheetTitle,
+                { color: theme.titleColor, fontSize: fs(14) },
+              ]}
+            >
+              {label}
+            </Text>
+
+            {searchable ? (
+              <TextInput
+                value={query}
+                onChangeText={setQuery}
+                placeholder={searchPlaceholder}
+                placeholderTextColor={theme.placeholderColor}
+                autoCorrect={false}
+                style={[
+                  styles.search,
+                  {
+                    color: theme.textColor,
+                    borderColor: theme.borderColor,
+                    backgroundColor: theme.inputBg,
+                    fontSize: fs(12),
+                    height: vs(40),
+                    borderRadius: ms(10),
+                    marginHorizontal: hs(16),
+                    marginTop: vs(12),
+                    paddingHorizontal: hs(12),
+                  },
+                ]}
+              />
+            ) : null}
+
+            <FlatList
+              data={filtered}
+              keyExtractor={(item) => item}
+              keyboardShouldPersistTaps="handled"
+              style={{ marginTop: vs(8), flexGrow: 0 }}
+              renderItem={({ item }) => {
+                const selected = item === value;
+                return (
+                  <Pressable
+                    onPress={() => {
+                      onSelect(item);
+                      setOpen(false);
+                    }}
+                    style={{
+                      paddingHorizontal: hs(20),
+                      paddingVertical: vs(14),
+                      backgroundColor: selected
+                        ? theme.selectedOptionBg
+                        : 'transparent',
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: theme.textColor,
+                        fontSize: fs(13),
+                        fontWeight: selected ? '600' : '400',
+                      }}
+                    >
+                      {item}
+                    </Text>
+                  </Pressable>
+                );
+              }}
+              ListEmptyComponent={
+                <Text
+                  style={{
+                    textAlign: 'center',
+                    color: theme.placeholderColor,
+                    fontSize: fs(12),
+                    marginTop: vs(24),
+                  }}
+                >
+                  No results
+                </Text>
+              }
+            />
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </>
+  );
+}
+
 const styles = StyleSheet.create({
   container: {
     width: '100%',
+  },
+  disabled: {
+    opacity: 0.5,
   },
   label: {
     fontWeight: '400',
   },
   inputWrapper: {
+    borderWidth: 0.4,
+    borderRadius: 12,
     flexDirection: 'row',
     alignItems: 'center',
     overflow: 'hidden',
@@ -139,4 +372,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     height: '100%',
   },
+  selectPressable: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: '100%',
+  },
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    overflow: 'hidden',
+  },
+  handleWrap: { alignItems: 'center', paddingTop: 10 },
+  handle: { width: 36, height: 4, borderRadius: 2 },
+  sheetTitle: {
+    fontWeight: '600',
+    textAlign: 'center',
+    marginTop: 10,
+  },
+  search: { borderWidth: 0.4 },
 });

@@ -1,13 +1,14 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { HomeScreen } from '@/screens/Home';
 import { WalletScreen } from '@/screens/Wallet';
-import { AnalyticsScreen, SettingsScreen } from '@/screens/Main';
+import { AIScreen, AnalyticsScreen, SettingsScreen } from '@/screens/Main';
 import { useTheme } from '@/context/ThemeContext';
 import { useResponsive } from '@/hooks/useResponsive';
+import { usePreferencesStore } from '@/stores/preferences.store';
 
 export type MainTabParamList = {
   HomeTab: undefined;
@@ -74,6 +75,10 @@ export function MainTabNavigator() {
   const insets = useSafeAreaInsets();
   const { ms, fs } = useResponsive();
 
+  useEffect(() => {
+    usePreferencesStore.getState().markOnboardingFinished();
+  }, []);
+
   const tabBarBg = isDark ? '#1A1A2F' : '#FFFFFF';
   const activeTint = '#191970';
   const inactiveTint = 'rgba(133,133,133,0.7)';
@@ -120,7 +125,7 @@ export function MainTabNavigator() {
       />
       <Tab.Screen
         name="AITab"
-        component={WalletScreen}
+        component={AIScreen}
         options={{
           tabBarLabel: '',
           tabBarButton: ({ onPress }) => (

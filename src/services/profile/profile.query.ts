@@ -9,6 +9,7 @@ import type { Address, ApiResponse } from '@/types';
 import { PROFILE_ENDPOINTS } from './profile.endpoints';
 import {
   getProfileAPI,
+  checkUsernameAPI,
   setupProfileAPI,
   verifyAddressAPI,
   verifyIdentityAPI,
@@ -22,6 +23,7 @@ import type {
   VerifyIdentityPayload,
   UploadSelfiePayload,
   SetupPinPayload,
+  CheckUsernameResponse,
 } from './profile.type';
 
 export function useGetProfileQuery(
@@ -50,6 +52,23 @@ export function useSetupProfileMutation(
   return useMutation({
     mutationKey: PROFILE_ENDPOINTS.SETUP.MUTATION_KEY,
     mutationFn: setupProfileAPI,
+    ...options,
+  });
+}
+
+export function useCheckUsernameQuery(
+  username: string,
+  options?: Omit<
+    UseQueryOptions<ApiResponse<CheckUsernameResponse>, AxiosError<unknown>>,
+    'queryKey' | 'queryFn'
+  >
+) {
+  const normalized = username.trim().replace(/^@/, '');
+  return useQuery({
+    queryKey: [...PROFILE_ENDPOINTS.CHECK_USERNAME.QUERY_KEY, normalized],
+    queryFn: () => checkUsernameAPI(normalized),
+    enabled: normalized.length >= 3,
+    staleTime: 30_000,
     ...options,
   });
 }

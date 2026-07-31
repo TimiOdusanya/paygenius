@@ -11,7 +11,7 @@ export interface AuthData {
 export type SendVerificationPayload = { phoneNumber: string };
 export type VerifyPhonePayload = { phoneNumber: string; code: string };
 export type RegisterPayload = { phoneNumber: string; password: string };
-export type LoginPayload = { phoneNumber: string; password: string };
+export type LoginPayload = { identifier: string; password: string };
 export type LoginBiometricPayload = { phoneNumber: string };
 export type GoogleAuthPayload = { idToken: string };
 export type GoogleCodePayload = { code: string; redirectUri?: string };

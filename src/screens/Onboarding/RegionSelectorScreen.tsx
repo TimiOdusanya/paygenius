@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -7,6 +7,7 @@ import { PrimaryButton } from '@/components/PrimaryButton';
 import { RegionCard } from '@/components/RegionCard';
 import { useTheme } from '@/context/ThemeContext';
 import { useResponsive } from '@/hooks/useResponsive';
+import { useTrackOnboardingRoute } from '@/hooks/useTrackOnboardingRoute';
 import {
   AppRegion,
   usePreferencesStore,
@@ -27,12 +28,20 @@ const SUBTITLE_DARK = '#E0E0E0';
 const CONTENT_MAX_WIDTH = 480;
 
 export function RegionSelectorScreen({ navigation }: Props) {
+  useTrackOnboardingRoute('RegionSelector');
   const insets = useSafeAreaInsets();
   const { isDark } = useTheme();
   const { hs, vs, fs, isLargeScreen, width } = useResponsive();
   const setRegion = usePreferencesStore((s) => s.setRegion);
+  const completeMarketingOnboarding = usePreferencesStore(
+    (s) => s.completeMarketingOnboarding
+  );
   const savedRegion = usePreferencesStore((s) => s.region);
   const [selected, setSelected] = useState<AppRegion>(savedRegion ?? 'NGN');
+
+  useEffect(() => {
+    usePreferencesStore.getState().setMarketingStep('RegionSelector');
+  }, []);
 
   // Figma frame 402: title inset 21, cards inset 33, button inset 22
   const sidePad = isLargeScreen
@@ -43,6 +52,7 @@ export function RegionSelectorScreen({ navigation }: Props) {
 
   const handleContinue = () => {
     setRegion(selected);
+    completeMarketingOnboarding();
     navigation.replace('Login');
   };
 

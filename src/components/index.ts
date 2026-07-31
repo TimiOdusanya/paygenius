@@ -3,5 +3,8 @@ export { ThemedText } from './ThemedText';
 export { ThemedButton } from './ThemedButton';
 export { ThemeToggle } from './ThemeToggle';
 export { PrimaryButton } from './PrimaryButton';
+export { BackButton } from './BackButton';
+export { FormInput, PasswordInput, SelectInput } from './FormInput';
+export type { SelectInputProps } from './FormInput';
 export { Header } from './Header';
 export type { HeaderTitleAlign, HeaderDescriptionAlign } from './Header';

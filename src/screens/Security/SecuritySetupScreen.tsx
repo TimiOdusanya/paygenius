@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
   Alert,
-  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -15,16 +14,18 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/RootNavigator';
 import { PrimaryButton } from '@/components/PrimaryButton';
-import { BackButton } from '@/components/BackButton';
+import { Header } from '@/components/Header';
 import { useTheme } from '@/context/ThemeContext';
 import { useResponsive } from '@/hooks/useResponsive';
+import { useTrackOnboardingRoute } from '@/hooks/useTrackOnboardingRoute';
 import { useSetupPinMutation } from '@/services/profile/profile.query';
-
-const LOCK_ICON = require('../../../assets/images/auth/lock-icon.png');
+import { getApiErrorMessage } from '@/utils/errors';
+import LockGlyph from '../../../assets/images/auth/lock-glyph.svg';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SecuritySetup'>;
 
 export function SecuritySetupScreen({ navigation }: Props) {
+  useTrackOnboardingRoute('SecuritySetup');
   const insets = useSafeAreaInsets();
   const { isDark } = useTheme();
   const { vs, fs, ms, hs } = useResponsive();
@@ -36,8 +37,6 @@ export function SecuritySetupScreen({ navigation }: Props) {
   const setupPinMutation = useSetupPinMutation();
 
   const bg = isDark ? '#1A1A1A' : '#FAFAFC';
-  const titleColor = isDark ? '#FFFFFF' : '#191970';
-  const subtitleColor = isDark ? '#CCCCCC' : '#6D6D8C';
   const inputBg = isDark ? '#1E1E2E' : '#FAFAFC';
   const inputBorder = isDark ? '#3B3B3B' : '#191970';
   const labelColor = isDark ? '#CCCCCC' : '#1A1D23';
@@ -60,8 +59,11 @@ export function SecuritySetupScreen({ navigation }: Props) {
       { pin, confirmPin: pin },
       {
         onSuccess: () => navigation.navigate('BiometricSetup'),
-        onError: (err: any) => {
-          Alert.alert('Error', err?.response?.data?.message ?? 'Failed to set up PIN.');
+        onError: (err) => {
+          Alert.alert(
+            'Error',
+            getApiErrorMessage(err, 'Failed to set up PIN. Please try again.')
+          );
         },
       }
     );
@@ -85,19 +87,12 @@ export function SecuritySetupScreen({ navigation }: Props) {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* Back */}
         <View style={{ paddingHorizontal: hs(21) }}>
-          <BackButton onPress={() => navigation.goBack()} />
-        </View>
-
-        {/* Title */}
-        <View style={[styles.titleBlock, { paddingHorizontal: hs(21), marginTop: vs(8), alignItems: 'center' }]}>
-          <Text style={[styles.title, { color: titleColor, fontSize: fs(16), letterSpacing: -0.32, textAlign: 'center' }]}>
-            Secure your wallet
-          </Text>
-          <Text style={[styles.subtitle, { color: subtitleColor, fontSize: fs(12), marginTop: vs(4), textAlign: 'center' }]}>
-            Create a transaction pin or use biometrics
-          </Text>
+          <Header
+            onBack={() => navigation.goBack()}
+            title="Secure your wallet"
+            description="Create a transaction pin or use biometrics"
+          />
         </View>
 
         {/* Key illustration */}
@@ -134,11 +129,20 @@ export function SecuritySetupScreen({ navigation }: Props) {
                 },
               ]}
             >
-              <Image
-                  source={LOCK_ICON}
-                  style={{ width: ms(60), height: ms(60) }}
-                  resizeMode="contain"
-                />
+              <View
+                style={{
+                  width: ms(72),
+                  height: ms(72),
+                  borderRadius: ms(36),
+                  backgroundColor: isDark ? '#2E1A5E' : '#AFE9D6',
+                  borderWidth: 3,
+                  borderColor: isDark ? '#8855DD' : '#D8C4FA',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <LockGlyph width={ms(36)} height={ms(44)} />
+              </View>
             </View>
           </View>
         </View>
@@ -242,10 +246,6 @@ export function SecuritySetupScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   scroll: { flexGrow: 1 },
-  backBtn: { height: 32, justifyContent: 'center', alignItems: 'flex-start' },
-  titleBlock: {},
-  title: { fontWeight: '600', textAlign: 'center' },
-  subtitle: { fontWeight: '400', textAlign: 'center' },
   iconWrap: { alignItems: 'center' },
   orbitOuter: {},
   orbitInner: {},

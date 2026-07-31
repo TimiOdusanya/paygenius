@@ -1,8 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Alert,
   Image,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -13,10 +11,12 @@ import * as LocalAuthentication from 'expo-local-authentication';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/RootNavigator';
 import { PrimaryButton } from '@/components/PrimaryButton';
-import { BackButton } from '@/components/BackButton';
+import { Header } from '@/components/Header';
 import { useTheme } from '@/context/ThemeContext';
 import { useResponsive } from '@/hooks/useResponsive';
+import { useTrackOnboardingRoute } from '@/hooks/useTrackOnboardingRoute';
 import { useEnableBiometricMutation } from '@/services/profile/profile.query';
+import { usePreferencesStore } from '@/stores/preferences.store';
 
 const FINGERPRINT_IMG = require('../../../assets/images/auth/fingerprint.png');
 const FACEID_IMG = require('../../../assets/images/auth/faceid-icon.png');
@@ -25,6 +25,7 @@ type BiometricType = 'fingerprint' | 'faceid' | 'none';
 type Props = NativeStackScreenProps<RootStackParamList, 'BiometricSetup'>;
 
 export function BiometricSetupScreen({ navigation }: Props) {
+  useTrackOnboardingRoute('BiometricSetup');
   const insets = useSafeAreaInsets();
   const { isDark } = useTheme();
   const { hs, vs, fs, ms } = useResponsive();
@@ -33,7 +34,6 @@ export function BiometricSetupScreen({ navigation }: Props) {
   const enableBiometricMutation = useEnableBiometricMutation();
 
   const bg = isDark ? '#1A1A1A' : '#FAFAFC';
-  const titleColor = isDark ? '#FFFFFF' : '#191970';
   const subtitleColor = isDark ? '#CCCCCC' : '#858585';
   const innerBg = isDark ? '#1E3A2F' : '#AFE9D6';
   const outerBorder = isDark ? '#2E5040' : '#D8C4FA';
@@ -68,17 +68,23 @@ export function BiometricSetupScreen({ navigation }: Props) {
       if (result.success) {
         enableBiometricMutation.mutate(undefined, {
           onSuccess: () => navigation.replace('AccountCreated'),
-          onError: () => navigation.replace('AccountCreated'),
+          onError: () => {
+            usePreferencesStore.getState().setBiometricSkipped(true);
+            navigation.replace('AccountCreated');
+          },
         });
       } else {
+        usePreferencesStore.getState().setBiometricSkipped(true);
         navigation.replace('AccountCreated');
       }
     } catch {
+      usePreferencesStore.getState().setBiometricSkipped(true);
       navigation.replace('AccountCreated');
     }
   };
 
   const handleSkip = () => {
+    usePreferencesStore.getState().setBiometricSkipped(true);
     navigation.replace('AccountCreated');
   };
 
@@ -94,18 +100,12 @@ export function BiometricSetupScreen({ navigation }: Props) {
       ]}
     >
       <View style={[styles.inner, { paddingHorizontal: hs(21) }]}>
-        {/* Back */}
-        <BackButton onPress={() => navigation.goBack()} />
-
-        {/* Title */}
-        <View style={{ marginTop: vs(16), alignItems: 'center' }}>
-          <Text style={[styles.title, { color: titleColor, fontSize: fs(16), letterSpacing: -0.32, lineHeight: fs(20), textAlign: 'center' }]}>
-            {isFaceId ? 'Face ID' : 'Biometrics'}
-          </Text>
-          <Text style={[styles.subtitle, { color: subtitleColor, fontSize: fs(12), marginTop: vs(4), textAlign: 'center' }]}>
-            {isFaceId ? 'Set your face ID' : 'Click on your finger print sensor'}
-          </Text>
-        </View>
+        <Header
+          onBack={() => navigation.goBack()}
+          onSkip={handleSkip}
+          title={isFaceId ? 'Face ID' : 'Biometrics'}
+          description={isFaceId ? 'Set your face ID' : 'Click on your finger print sensor'}
+        />
 
         {/* Biometric illustration */}
         <View style={[styles.illustrationWrap, { marginTop: vs(40) }]}>
@@ -198,9 +198,6 @@ export function BiometricSetupScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   inner: { flex: 1 },
-  backBtn: { width: 32, height: 32, justifyContent: 'center', alignItems: 'flex-start' },
-  title: { fontWeight: '600' },
-  subtitle: { fontWeight: '400' },
   illustrationWrap: { alignItems: 'center' },
   outerRing: { borderWidth: 1, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
   innerRing: { borderWidth: 4, alignItems: 'center', justifyContent: 'center' },

@@ -73,6 +73,7 @@ export function BudgetAccountSelectionScreen({ navigation, route }: Props) {
             Select an account for your Budget
           </Text>
         </View>
+        <View style={{ width: 22 }} />
       </View>
 
       {/* Account type toggles */}

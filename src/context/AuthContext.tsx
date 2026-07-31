@@ -29,7 +29,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = useCallback(
     async (phone: string, password: string) => {
       const res = await loginMutation.mutateAsync({
-        phoneNumber: phone,
+        identifier: phone,
         password,
       });
       if (!res.success || !res.data?.token) {

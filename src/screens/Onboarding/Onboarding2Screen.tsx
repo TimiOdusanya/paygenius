@@ -1,17 +1,18 @@
-import React from "react";
+import React, { useEffect } from "react";
 import {
   View,
   Text,
   StyleSheet,
-  Pressable,
   useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "@/navigation/RootNavigator";
+import { useTrackOnboardingRoute } from '@/hooks/useTrackOnboardingRoute';
 import { useTheme } from "@/context/ThemeContext";
 import { Header } from "@/components/Header";
 import { PrimaryButton } from "@/components/PrimaryButton";
+import { usePreferencesStore } from "@/stores/preferences.store";
 import { StepDots } from "./StepDots";
 import {
   styles as onboardingStyles,
@@ -20,7 +21,6 @@ import {
   TITLE_COLOR_DARK,
   DESC_COLOR_LIGHT,
   DESC_COLOR_DARK,
-  SKIP_COLOR_DARK,
   HIGHLIGHT_PURPLE,
   IMAGE_WIDTH_INSET,
   IMAGE_HEIGHT_RATIO,
@@ -32,11 +32,16 @@ import Splash2Svg from "../../../assets/images/onboarding/splash-2.svg";
 type Props = NativeStackScreenProps<RootStackParamList, "Onboarding2">;
 
 export function Onboarding2Screen({ navigation }: Props) {
+  useTrackOnboardingRoute('Onboarding2');
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const { isDark } = useTheme();
   const imageWidth = width - IMAGE_WIDTH_INSET;
   const imageHeight = imageWidth * IMAGE_HEIGHT_RATIO;
+
+  useEffect(() => {
+    usePreferencesStore.getState().setMarketingStep("Onboarding2");
+  }, []);
 
   const goToRegion = () => navigation.replace("RegionSelector");
   const goBack = () => navigation.replace("Onboarding1");
@@ -50,19 +55,9 @@ export function Onboarding2Screen({ navigation }: Props) {
       ]}
     >
       <Header
+        variant="bar"
         onBack={goBack}
-        rightElement={
-          <Pressable onPress={goToRegion} hitSlop={12}>
-            <Text
-              style={[
-                styles.skipText,
-                { color: isDark ? SKIP_COLOR_DARK : TITLE_COLOR_LIGHT },
-              ]}
-            >
-              Skip
-            </Text>
-          </Pressable>
-        }
+        onSkip={goToRegion}
         style={onboardingStyles.headerWrap}
       />
       <View style={onboardingStyles.imageSection}>
@@ -113,9 +108,5 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: 24,
-  },
-  skipText: {
-    fontSize: 16,
-    fontWeight: "500",
   },
 });

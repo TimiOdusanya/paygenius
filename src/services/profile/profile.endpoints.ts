@@ -3,6 +3,10 @@ export const PROFILE_ENDPOINTS = {
     ROUTE: '/api/profile/',
     QUERY_KEY: ['profile'],
   },
+  CHECK_USERNAME: {
+    ROUTE: '/api/profile/check-username',
+    QUERY_KEY: ['profile', 'check-username'],
+  },
   SETUP: {
     ROUTE: '/api/profile/setup',
     MUTATION_KEY: ['profile', 'setup'],

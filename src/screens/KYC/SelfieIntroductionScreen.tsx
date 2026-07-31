@@ -9,14 +9,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/RootNavigator';
-import { PrimaryButton } from '@/components/PrimaryButton';
-import { BackButton } from '@/components/BackButton';
+import { Header, PrimaryButton } from '@/components';
 import { useTheme } from '@/context/ThemeContext';
 import { useResponsive } from '@/hooks/useResponsive';
+import { useTrackOnboardingRoute } from '@/hooks/useTrackOnboardingRoute';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SelfieIntroduction'>;
 
 export function SelfieIntroductionScreen({ navigation }: Props) {
+  useTrackOnboardingRoute('SelfieIntroduction');
   const insets = useSafeAreaInsets();
   const { isDark } = useTheme();
   const { hs, vs, fs, ms } = useResponsive();
@@ -26,9 +27,8 @@ export function SelfieIntroductionScreen({ navigation }: Props) {
 
   return (
     <View style={[styles.container, { backgroundColor: bg, paddingTop: insets.top }]}>
-      {/* Back */}
       <View style={{ paddingHorizontal: hs(21), marginTop: vs(8) }}>
-        <BackButton onPress={() => navigation.goBack()} />
+        <Header variant="bar" onBack={() => navigation.goBack()} />
       </View>
 
       {/* Greeting */}

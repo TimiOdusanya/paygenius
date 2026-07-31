@@ -12,15 +12,18 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/RootNavigator';
-import { BackButton } from '@/components/BackButton';
+import { Header } from '@/components/Header';
 import { OTPInput } from '@/components/OTPInput';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { useTheme } from '@/context/ThemeContext';
 import { useResponsive } from '@/hooks/useResponsive';
+import { useTrackOnboardingRoute } from '@/hooks/useTrackOnboardingRoute';
 import {
   useVerifyPhoneMutation,
   useSendVerificationMutation,
 } from '@/services/auth/auth.query';
+import { usePreferencesStore } from '@/stores/preferences.store';
+import { getApiErrorMessage } from '@/utils/errors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'OTPVerification'>;
 
@@ -28,6 +31,7 @@ const OTP_LENGTH = 4;
 
 export function OTPVerificationScreen({ navigation, route }: Props) {
   const { phoneNumber } = route.params;
+  useTrackOnboardingRoute('OTPVerification', { phoneNumber });
   const insets = useSafeAreaInsets();
   const { isDark } = useTheme();
   const { hs, vs, fs } = useResponsive();
@@ -36,7 +40,6 @@ export function OTPVerificationScreen({ navigation, route }: Props) {
   const [resendCountdown, setResendCountdown] = useState(59);
 
   const bg = isDark ? '#1A1A1A' : '#FAFAFC';
-  const titleColor = isDark ? '#FFFFFF' : '#191970';
   const subtitleColor = isDark ? '#CCCCCC' : '#858585';
   const resendColor = isDark ? '#8888FF' : '#191970';
 
@@ -57,13 +60,16 @@ export function OTPVerificationScreen({ navigation, route }: Props) {
       { phoneNumber, code: otp },
       {
         onSuccess: () => {
+          usePreferencesStore
+            .getState()
+            .setRegistrationProgress(phoneNumber, 'CreatePassword');
           navigation.navigate('CreatePassword', { phoneNumber });
         },
-        onError: (err: any) => {
-          const msg =
-            err?.response?.data?.message ??
-            'Invalid verification code. Please try again.';
-          Alert.alert('Verification Failed', msg);
+        onError: (err) => {
+          Alert.alert(
+            'Verification Failed',
+            getApiErrorMessage(err, 'Invalid verification code. Please try again.')
+          );
           setOtp('');
         },
       }
@@ -80,10 +86,10 @@ export function OTPVerificationScreen({ navigation, route }: Props) {
           setOtp('');
           Alert.alert('Code Sent', 'A new verification code has been sent.');
         },
-        onError: (err: any) => {
+        onError: (err) => {
           Alert.alert(
             'Error',
-            err?.response?.data?.message ?? 'Failed to resend code.'
+            getApiErrorMessage(err, 'Failed to resend code. Please try again.')
           );
         },
       }
@@ -109,26 +115,11 @@ export function OTPVerificationScreen({ navigation, route }: Props) {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <BackButton onPress={() => navigation.goBack()} />
-
-        <View style={[styles.titleBlock, { marginTop: vs(16) }]}>
-          <Text
-            style={[
-              styles.title,
-              { color: titleColor, fontSize: fs(16), letterSpacing: -0.32 },
-            ]}
-          >
-            Verify Phone
-          </Text>
-          <Text
-            style={[
-              styles.subtitle,
-              { color: subtitleColor, fontSize: fs(12), marginTop: vs(4) },
-            ]}
-          >
-            Enter the 4-digit code sent to {maskedPhone}
-          </Text>
-        </View>
+        <Header
+          onBack={() => navigation.goBack()}
+          title="Verify Phone"
+          description={`Enter the 4-digit code sent to ${maskedPhone}`}
+        />
 
         <View style={{ marginTop: vs(32) }}>
           <OTPInput length={OTP_LENGTH} value={otp} onChange={setOtp} />
@@ -171,9 +162,6 @@ export function OTPVerificationScreen({ navigation, route }: Props) {
 
 const styles = StyleSheet.create({
   scroll: { flexGrow: 1 },
-  titleBlock: { alignItems: 'center' },
-  title: { fontWeight: '600', textAlign: 'center' },
-  subtitle: { fontWeight: '400', textAlign: 'center' },
   resendRow: { alignItems: 'center' },
   resendText: { fontWeight: '400' },
   footer: {},

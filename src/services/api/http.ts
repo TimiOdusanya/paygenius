@@ -35,7 +35,7 @@ export const createApiClient = (baseURL: string): AxiosInstance => {
       return config;
     },
     (error) => {
-      console.error('[API →] Request error:', error.message);
+      console.log('[API →] Request error:', error.message);
       return Promise.reject(error);
     }
   );
@@ -46,23 +46,28 @@ export const createApiClient = (baseURL: string): AxiosInstance => {
       console.log(`[API ←] ${res.status} ${res.config.url}`, res.data?.message ?? '');
       // Dev-only: log OTP code returned by backend when Twilio is not configured
       if (res.data?.devCode) {
-        console.warn(`[DEV OTP CODE] ${res.data.devCode}`);
+        console.log(`[DEV OTP CODE] ${res.data.devCode}`);
       }
       return res;
     },
     (error) => {
       if (error.response) {
-        console.error(
-          `[API ✗] ${error.response.status} ${error.config?.url}`,
+        const status = error.response.status;
+        // Use console.log for expected client errors (4xx) so React Native LogBox
+        // does not flash a red/yellow popup for normal validation failures.
+        const log =
+          status >= 500 ? console.error : console.log;
+        log(
+          `[API ✗] ${status} ${error.config?.url}`,
           error.response.data?.message ?? error.message
         );
-        if (error.response.status === 401) {
+        if (status === 401) {
           useAuthStore.getState().clearAuth();
         }
       } else if (error.request) {
-        console.error('[API ✗] No response received – is the backend running?', error.message);
+        console.log('[API ✗] No response received – is the backend running?', error.message);
       } else {
-        console.error('[API ✗] Request setup error:', error.message);
+        console.log('[API ✗] Request setup error:', error.message);
       }
       return Promise.reject(error);
     }

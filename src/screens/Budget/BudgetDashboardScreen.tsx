@@ -133,6 +133,7 @@ export function BudgetDashboardScreen({ navigation }: Props) {
             My Budgets
           </Text>
         </View>
+        <View style={{ width: 22 }} />
       </View>
 
       <ScrollView

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  Alert,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -15,16 +15,23 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/RootNavigator';
 import { FormInput } from '@/components/FormInput';
-import { BackButton } from '@/components/BackButton';
+import { Header } from '@/components/Header';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { useTheme } from '@/context/ThemeContext';
 import { useResponsive } from '@/hooks/useResponsive';
+import { useTrackOnboardingRoute } from '@/hooks/useTrackOnboardingRoute';
 import { useVerifyIdentityMutation } from '@/services/profile/profile.query';
+import { getApiErrorMessage } from '@/utils/errors';
+import IdentityCheck from '../../../assets/images/kyc/identity-check.svg';
+
+const IDENTITY_PHOTO = require('../../../assets/images/kyc/identity-photo.jpg');
+const CBN_LOGO = require('../../../assets/images/kyc/cbn-logo.png');
 
 type IDType = 'BVN' | 'NIN';
 type Props = NativeStackScreenProps<RootStackParamList, 'IdentityVerification'>;
 
 export function IdentityVerificationScreen({ navigation }: Props) {
+  useTrackOnboardingRoute('IdentityVerification');
   const insets = useSafeAreaInsets();
   const { isDark } = useTheme();
   const { hs, vs, fs, ms } = useResponsive();
@@ -37,32 +44,45 @@ export function IdentityVerificationScreen({ navigation }: Props) {
   const verifyIdentityMutation = useVerifyIdentityMutation();
 
   const bg = isDark ? '#1A1A1A' : '#FAFAFC';
-  const titleColor = isDark ? '#FFFFFF' : '#191970';
-  const subtitleColor = isDark ? '#CCCCCC' : '#858585';
   const inputBorder = isDark ? '#3B3B3B' : '#191970';
   const inputBg = isDark ? '#2A2A2A' : '#FAFAFC';
   const infoText = isDark ? '#666666' : '#858585';
   const activeBg = isDark ? '#1A3B2E' : '#AFE9DC';
   const activeText = isDark ? '#FFFFFF' : '#1A1D23';
-  const inactiveText = isDark ? 'rgba(133,133,133,0.6)' : 'rgba(133,133,133,0.6)';
+  const inactiveText = 'rgba(133,133,133,0.6)';
+  const card1Bg = isDark ? '#2A4A40' : '#C6F0E2';
+  const card2Bg = isDark ? '#3A2060' : '#E5D8FB';
+  const checkBg = isDark ? '#1A3B2E' : '#AFE9D6';
 
   const handleContinue = () => {
     if (!idNumber.trim()) return;
-    const payload: any = { type: idType, number: idNumber.trim() };
-    if (idType === 'BVN' && phone.trim()) {
+    if (idType === 'BVN' && !phone.trim()) return;
+
+    const payload: {
+      type: IDType;
+      number: string;
+      phoneNumber?: string;
+    } = { type: idType, number: idNumber.trim() };
+
+    if (idType === 'BVN') {
       payload.phoneNumber = phone.trim();
     }
+
     verifyIdentityMutation.mutate(payload, {
       onSuccess: () => navigation.navigate('VerificationCompleted'),
-      onError: (err: any) => {
-        const msg = err?.response?.data?.message ?? 'Identity verification failed.';
-        setErrorMsg(msg);
+      onError: (err) => {
+        setErrorMsg(
+          getApiErrorMessage(err, `The number does not match with the ${idType}`)
+        );
         setShowError(true);
       },
     });
   };
 
-  const handleError = () => setShowError(true);
+  const canContinue =
+    Boolean(idNumber.trim()) &&
+    (idType === 'NIN' || Boolean(phone.trim())) &&
+    !verifyIdentityMutation.isPending;
 
   return (
     <KeyboardAvoidingView
@@ -81,36 +101,79 @@ export function IdentityVerificationScreen({ navigation }: Props) {
         showsVerticalScrollIndicator={false}
       >
         <View style={[styles.inner, { paddingHorizontal: hs(21) }]}>
-          {/* Back */}
-          <BackButton onPress={() => navigation.goBack()} />
+          <Header
+            onBack={() => navigation.goBack()}
+            title="Verify Your Identity"
+            description="Choose an ID type"
+          />
 
-          {/* Title */}
-          <View style={{ marginTop: vs(16), alignItems: 'center' }}>
-            <Text style={[styles.title, { color: titleColor, fontSize: fs(16), letterSpacing: -0.32, lineHeight: fs(20), textAlign: 'center' }]}>
-              Verify Your Identity
-            </Text>
-            <Text style={[styles.subtitle, { color: subtitleColor, fontSize: fs(12), marginTop: vs(4), textAlign: 'center' }]}>
-              Choose an ID type
-            </Text>
-          </View>
-
-          {/* Illustration – two tilted cards */}
-          <View style={[styles.illustrationWrap, { marginTop: vs(12), height: vs(120) }]}>
-            <View style={[styles.card1, { backgroundColor: isDark ? '#2A1A4A' : '#C6F0E2' }]} />
-            <View style={[styles.card2, { backgroundColor: isDark ? '#3A2060' : '#E5D8FB' }]}>
-              {/* Profile photo placeholder */}
-              <View style={[styles.photoCircle, { backgroundColor: isDark ? '#2A3A2A' : '#AFE9D6', borderColor: isDark ? '#7C3AED' : '#7C3AED' }]}>
-                <Ionicons name="person" size={ms(14)} color={isDark ? '#A78BFA' : '#7C3AED'} />
+          {/* Figma illustration: stacked ID cards + photo + check */}
+          <View style={[styles.illustrationWrap, { marginTop: vs(12), height: vs(130) }]}>
+            <View
+              style={[
+                styles.card1,
+                {
+                  backgroundColor: card1Bg,
+                  width: ms(161),
+                  height: ms(91),
+                  borderRadius: ms(10),
+                },
+              ]}
+            />
+            <View
+              style={[
+                styles.card2,
+                {
+                  backgroundColor: card2Bg,
+                  width: ms(161),
+                  height: ms(90),
+                  borderRadius: ms(10),
+                  paddingLeft: ms(18),
+                  paddingRight: ms(12),
+                },
+              ]}
+            >
+              <View
+                style={[
+                  styles.photoCircle,
+                  {
+                    width: ms(41),
+                    height: ms(58),
+                    borderRadius: ms(108),
+                    borderColor: '#7C3AED',
+                  },
+                ]}
+              >
+                <Image
+                  source={IDENTITY_PHOTO}
+                  style={styles.photoImage}
+                  resizeMode="cover"
+                />
               </View>
-              <View style={[styles.cardCheck, { backgroundColor: isDark ? '#1A3B2E' : '#AFE9D6' }]}>
-                <Ionicons name="checkmark" size={ms(22)} color={isDark ? '#10B981' : '#7C3AED'} />
+              <View
+                style={[
+                  styles.cardCheck,
+                  {
+                    width: ms(53),
+                    height: ms(53),
+                    borderRadius: ms(27),
+                    backgroundColor: checkBg,
+                  },
+                ]}
+              >
+                <IdentityCheck width={ms(28)} height={ms(27)} />
               </View>
             </View>
           </View>
 
           {/* ID Toggle */}
           <View style={{ marginTop: vs(16) }}>
-            <Text style={[styles.fieldLabel, { color: isDark ? '#FFFFFF' : '#000000', fontSize: fs(11) }]}>
+            <Text
+              style={[
+                styles.fieldLabel,
+                { color: isDark ? '#FFFFFF' : '#000000', fontSize: fs(11) },
+              ]}
+            >
               Choose ID
             </Text>
             <View style={[styles.toggleRow, { marginTop: vs(8), gap: hs(8) }]}>
@@ -120,6 +183,7 @@ export function IdentityVerificationScreen({ navigation }: Props) {
                   onPress={() => {
                     setIdType(type);
                     setIdNumber('');
+                    setPhone('');
                   }}
                   style={[
                     styles.toggleBtn,
@@ -132,7 +196,15 @@ export function IdentityVerificationScreen({ navigation }: Props) {
                     },
                   ]}
                 >
-                  <Text style={[styles.toggleText, { color: idType === type ? activeText : inactiveText, fontSize: fs(14) }]}>
+                  <Text
+                    style={[
+                      styles.toggleText,
+                      {
+                        color: idType === type ? activeText : inactiveText,
+                        fontSize: fs(14),
+                      },
+                    ]}
+                  >
                     {type}
                   </Text>
                 </Pressable>
@@ -140,63 +212,96 @@ export function IdentityVerificationScreen({ navigation }: Props) {
             </View>
           </View>
 
-          {/* ID Number input */}
           <View style={{ marginTop: vs(12) }}>
             <FormInput
               label={`Your ${idType}`}
               value={idNumber}
               onChangeText={setIdNumber}
-              placeholder="0123456789"
-              keyboardType="numeric"
-              maxLength={11}
+              placeholder={idType === 'NIN' ? 'AB012345678910YZ' : '0123456789'}
+              autoCapitalize={idType === 'NIN' ? 'characters' : 'none'}
+              keyboardType={idType === 'NIN' ? 'default' : 'numeric'}
+              maxLength={idType === 'NIN' ? 16 : 11}
             />
           </View>
 
-          {/* Phone attached to ID */}
-          <View style={{ marginTop: vs(12) }}>
-            <Text style={[styles.fieldLabel, { color: isDark ? '#FFFFFF' : '#000000', fontSize: fs(12) }]}>
-              Input the number attached to your {idType}
-            </Text>
-            <FormInput
-              label=""
-              value={phone}
-              onChangeText={setPhone}
-              placeholder="080 0000 0000"
-              keyboardType="phone-pad"
-            />
-          </View>
+          {/* Phone is BVN-only (hidden for NIN per Figma 1:11870) */}
+          {idType === 'BVN' ? (
+            <View style={{ marginTop: vs(12) }}>
+              <FormInput
+                label="Input the number attached to your BVN"
+                value={phone}
+                onChangeText={setPhone}
+                placeholder="080 0000 0000"
+                keyboardType="phone-pad"
+              />
+            </View>
+          ) : null}
 
-          {/* Info text */}
-          <View style={{ marginTop: vs(20) }}>
-            <Text style={[styles.info, { color: infoText, fontSize: fs(8), lineHeight: fs(12) }]}>
-              Your {idType} is secure. It does not give us access to your other bank accounts or transactions. We will only have access to your full name, gender, date of birth and phone number.
+          <View style={{ marginTop: vs(20), alignItems: 'center' }}>
+            <Text
+              style={[
+                styles.info,
+                {
+                  color: infoText,
+                  fontSize: fs(8),
+                  lineHeight: fs(12),
+                  width: hs(264),
+                },
+              ]}
+            >
+              Your {idType} is secure. It does not give us access to your other
+              bank accounts or transactions. We will only have access to your
+              full name, gender, date of birth and phone number.
             </Text>
-            <Text style={[styles.info, { color: infoText, fontSize: fs(8), lineHeight: fs(12), marginTop: vs(8), textAlign: 'center' }]}>
+            <Text
+              style={[
+                styles.info,
+                {
+                  color: infoText,
+                  fontSize: fs(8),
+                  lineHeight: fs(12),
+                  marginTop: vs(8),
+                },
+              ]}
+            >
               PayGenius is Fully Licensed by the CBN
             </Text>
+            <Image
+              source={CBN_LOGO}
+              style={{
+                width: ms(51),
+                height: ms(68),
+                marginTop: vs(6),
+              }}
+              resizeMode="contain"
+            />
           </View>
 
           <View style={styles.footer}>
             <PrimaryButton
-              title={verifyIdentityMutation.isPending ? 'Verifying...' : 'Continue'}
+              title={
+                verifyIdentityMutation.isPending ? 'Verifying...' : 'Continue'
+              }
               onPress={handleContinue}
-              disabled={!idNumber.trim() || verifyIdentityMutation.isPending}
-              style={!idNumber.trim() ? styles.btnDisabled : undefined}
+              disabled={!canContinue}
+              style={!canContinue ? styles.btnDisabled : undefined}
             />
           </View>
         </View>
       </ScrollView>
 
-      {/* Error overlay modal */}
       <Modal visible={showError} transparent animationType="fade">
-        <Pressable style={styles.modalOverlay} onPress={() => setShowError(false)}>
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setShowError(false)}
+        >
           <View style={styles.modalCard}>
             <View style={styles.errorIconCircle}>
               <Ionicons name="alert" size={20} color="#FFFFFF" />
             </View>
             <Text style={[styles.errorTitle, { fontSize: fs(14) }]}>Error</Text>
             <Text style={[styles.errorMsg, { fontSize: fs(10) }]}>
-              The Number does not match with the {idType}
+              {errorMsg || `The number does not match with the ${idType}`}
             </Text>
           </View>
         </Pressable>
@@ -208,15 +313,12 @@ export function IdentityVerificationScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   scroll: { flexGrow: 1 },
   inner: { flex: 1 },
-  backBtn: { width: 32, height: 32, justifyContent: 'center', alignItems: 'flex-start' },
-  title: { fontWeight: '600' },
-  subtitle: { fontWeight: '400' },
-  illustrationWrap: { alignItems: 'center', justifyContent: 'center' },
+  illustrationWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   card1: {
     position: 'absolute',
-    width: 161,
-    height: 91,
-    borderRadius: 10,
     transform: [{ rotate: '9.12deg' }],
     shadowColor: '#B200FF',
     shadowOffset: { width: 0, height: 3 },
@@ -224,28 +326,35 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
   card2: {
-    width: 161,
-    height: 90,
-    borderRadius: 10,
     transform: [{ rotate: '14.42deg' }],
     shadowColor: '#10B981',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 2,
-    alignItems: 'flex-end',
-    justifyContent: 'center',
-    paddingRight: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  photoCircle: {
+    borderWidth: 2,
+    overflow: 'hidden',
+  },
+  photoImage: {
+    width: '100%',
+    height: '100%',
   },
   cardCheck: {
-    width: 53,
-    height: 53,
-    borderRadius: 27,
     alignItems: 'center',
     justifyContent: 'center',
+    transform: [{ rotate: '8.11deg' }],
   },
   fieldLabel: { fontWeight: '400', letterSpacing: 0.25 },
   toggleRow: { flexDirection: 'row' },
-  toggleBtn: { borderWidth: 0.4, alignItems: 'center', justifyContent: 'center' },
+  toggleBtn: {
+    borderWidth: 0.4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   toggleText: { fontWeight: '400' },
   info: { fontWeight: '400', textAlign: 'center' },
   footer: { marginTop: 'auto', paddingTop: 24, paddingBottom: 8 },
@@ -287,19 +396,5 @@ const styles = StyleSheet.create({
     backgroundColor: '#FF8283',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  photoCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-    position: 'absolute',
-    left: 12,
-    top: 10,
-  },
-    marginBottom: 4,
   },
 });

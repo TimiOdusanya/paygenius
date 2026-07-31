@@ -5,3 +5,4 @@ export {
   fontScale,
   isAtBreakpoint,
 } from './responsive';
+export { getApiErrorMessage } from './errors';

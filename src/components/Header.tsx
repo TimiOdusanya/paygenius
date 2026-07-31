@@ -1,79 +1,114 @@
-import React from "react";
-import { View, Text, StyleSheet, ViewStyle } from "react-native";
-import { useTheme } from "@/context/ThemeContext";
-import { BackButton } from "@/components/BackButton";
+import React from 'react';
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  ViewStyle,
+} from 'react-native';
+import { useTheme } from '@/context/ThemeContext';
+import { useResponsive } from '@/hooks/useResponsive';
+import { BackButton } from '@/components/BackButton';
 
-export type HeaderTitleAlign = "left" | "center";
-export type HeaderDescriptionAlign = "left" | "center";
+export type HeaderTitleAlign = 'left' | 'center';
+export type HeaderDescriptionAlign = 'left' | 'center';
 
 type HeaderProps = {
-  /** When provided, shows the back button (left div) and calls this on press */
+  /** Shows back button when provided */
   onBack?: () => void;
-  /** Optional right-side content (e.g. icon, text) */
+  /** Convenience Skip action (right side). Ignored if `rightElement` is set. */
+  onSkip?: () => void;
+  skipLabel?: string;
+  /** Custom right-side content (overrides Skip) */
   rightElement?: React.ReactNode;
-  /** Main heading text */
   title?: string;
-  /** Heading alignment */
-  titleAlign?: HeaderTitleAlign;
-  /** Optional description below the heading */
   description?: string;
-  /** Description alignment */
+  titleAlign?: HeaderTitleAlign;
   descriptionAlign?: HeaderDescriptionAlign;
-  /** Optional style for the top row container */
+  /**
+   * `auth` — KYC / login form header (16px title, 12px subtitle, navy).
+   * `bar` — top controls only (onboarding marketing slides).
+   */
+  variant?: 'auth' | 'bar';
   style?: ViewStyle;
 };
 
 export function Header({
   onBack,
+  onSkip,
+  skipLabel = 'Skip',
   rightElement,
   title,
-  titleAlign = "left",
   description,
-  descriptionAlign = "left",
+  titleAlign = 'center',
+  descriptionAlign = 'center',
+  variant = 'auth',
   style,
 }: HeaderProps) {
-  const { colors } = useTheme();
+  const { isDark } = useTheme();
+  const { fs, vs } = useResponsive();
+
+  const titleColor = isDark ? '#FFFFFF' : '#191970';
+  const descriptionColor = isDark ? '#CCCCCC' : '#858585';
+  const skipColor = isDark ? '#FFFFFF' : '#191970';
+
+  const resolvedRight =
+    rightElement != null ? (
+      <View style={styles.rightSlot}>{rightElement}</View>
+    ) : onSkip ? (
+      <Pressable onPress={onSkip} hitSlop={12} style={styles.rightSlot}>
+        <Text style={[styles.skipText, { color: skipColor, fontSize: fs(12) }]}>
+          {skipLabel}
+        </Text>
+      </Pressable>
+    ) : (
+      <View style={styles.sidePlaceholder} />
+    );
 
   return (
     <View style={[styles.wrap, style]}>
       <View style={styles.topRow}>
         {onBack ? (
-          <BackButton onPress={onBack} size={32} />
+          <BackButton onPress={onBack} />
         ) : (
-          <View style={styles.backPlaceholder} />
+          <View style={styles.sidePlaceholder} />
         )}
         <View style={styles.spacer} />
-        {rightElement != null ? (
-          <View style={styles.rightSlot}>{rightElement}</View>
-        ) : (
-          <View style={styles.backPlaceholder} />
-        )}
+        {resolvedRight}
       </View>
 
-      {title != null && title !== "" ? (
-        <Text
-          style={[
-            styles.title,
-            { color: colors.text },
-            titleAlign === "center" ? styles.titleCenter : styles.titleLeft,
-          ]}
-        >
-          {title}
-        </Text>
-      ) : null}
-
-      {description != null && description !== "" ? (
-        <Text
-          style={[
-            styles.description,
-            { color: colors.textSecondary },
-            descriptionAlign === "center"
-              ? styles.descriptionCenter
-              : styles.descriptionLeft,
-          ]}
-        >
-          {description}
-        </Text>
+      {variant === 'auth' && title ? (
+        <View style={[styles.titleBlock, { marginTop: vs(16) }]}>
+          <Text
+            style={[
+              styles.title,
+              {
+                color: titleColor,
+                fontSize: fs(16),
+                letterSpacing: -0.32,
+                lineHeight: fs(20),
+                textAlign: titleAlign,
+              },
+            ]}
+          >
+            {title}
+          </Text>
+          {description ? (
+            <Text
+              style={[
+                styles.description,
+                {
+                  color: descriptionColor,
+                  fontSize: fs(12),
+                  marginTop: vs(4),
+                  textAlign: descriptionAlign,
+                },
+              ]}
+            >
+              {description}
+            </Text>
+          ) : null}
+        </View>
       ) : null}
     </View>
   );
@@ -81,47 +116,37 @@ export function Header({
 
 const styles = StyleSheet.create({
   wrap: {
-    width: "100%",
+    width: '100%',
   },
   topRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    width: "100%",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
   },
-  backPlaceholder: {
-    width: 32,
-    height: 32,
+  sidePlaceholder: {
+    width: 22,
+    height: 22,
   },
   spacer: {
     flex: 1,
   },
   rightSlot: {
-    minWidth: 32,
-    height: 32,
-    alignItems: "flex-end",
-    justifyContent: "center",
+    minWidth: 22,
+    minHeight: 22,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+  },
+  skipText: {
+    fontWeight: '500',
+  },
+  titleBlock: {
+    width: '100%',
   },
   title: {
-    fontSize: 22,
-    fontWeight: "700",
-    marginTop: 12,
-  },
-  titleLeft: {
-    textAlign: "left",
-  },
-  titleCenter: {
-    textAlign: "center",
+    fontWeight: '600',
   },
   description: {
-    fontSize: 14,
-    marginTop: 4,
-    opacity: 0.8,
-  },
-  descriptionLeft: {
-    textAlign: "left",
-  },
-  descriptionCenter: {
-    textAlign: "center",
+    fontWeight: '400',
   },
 });

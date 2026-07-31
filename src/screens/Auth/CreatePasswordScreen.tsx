@@ -1,10 +1,8 @@
 import React, { useState } from 'react';
 import {
   Alert,
-  Image,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -14,22 +12,25 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/RootNavigator';
 import { PasswordInput } from '@/components/FormInput';
-import { BackButton } from '@/components/BackButton';
+import { Header } from '@/components/Header';
 import { PasswordStrengthBar, getPasswordStrength } from '@/components/PasswordStrengthBar';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { useTheme } from '@/context/ThemeContext';
 import { useResponsive } from '@/hooks/useResponsive';
+import { useTrackOnboardingRoute } from '@/hooks/useTrackOnboardingRoute';
 import { useRegisterMutation } from '@/services/auth/auth.query';
-
-const LOCK_ICON = require('../../../assets/images/auth/lock-icon.png');
+import { usePreferencesStore } from '@/stores/preferences.store';
+import { getApiErrorMessage } from '@/utils/errors';
+import LockGlyph from '../../../assets/images/auth/lock-glyph.svg';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CreatePassword'>;
 
 export function CreatePasswordScreen({ navigation, route }: Props) {
   const { phoneNumber } = route.params;
+  useTrackOnboardingRoute('CreatePassword', { phoneNumber });
   const insets = useSafeAreaInsets();
   const { isDark } = useTheme();
-  const { hs, vs, fs } = useResponsive();
+  const { hs, vs, fs, ms } = useResponsive();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showMismatch, setShowMismatch] = useState(false);
@@ -37,9 +38,9 @@ export function CreatePasswordScreen({ navigation, route }: Props) {
   const registerMutation = useRegisterMutation();
 
   const bg = isDark ? '#1A1A1A' : '#FAFAFC';
-  const titleColor = isDark ? '#FFFFFF' : '#191970';
-  const subtitleColor = isDark ? '#CCCCCC' : '#858585';
-  const hintColor = isDark ? '#666666' : '#C4C4C4';
+  const outerRing = isDark ? '#6633CC' : '#D8C4FA';
+  const innerBg = isDark ? '#2E1A5E' : '#AFE9D6';
+  const innerBorder = isDark ? '#8855DD' : '#D8C4FA';
 
   const strength = getPasswordStrength(password);
   const isReady = password.length >= 6 && strength !== 'weak';
@@ -57,15 +58,21 @@ export function CreatePasswordScreen({ navigation, route }: Props) {
       { phoneNumber, password },
       {
         onSuccess: () => {
+          usePreferencesStore.getState().clearRegistrationProgress();
           navigation.navigate('ProfileIntroduction');
         },
-        onError: (err: any) => {
-          const msg = err?.response?.data?.message ?? 'Registration failed. Please try again.';
-          Alert.alert('Error', msg);
+        onError: (err) => {
+          Alert.alert(
+            'Error',
+            getApiErrorMessage(err, 'Registration failed. Please try again.')
+          );
         },
       }
     );
   };
+
+  const outerSize = ms(165);
+  const innerSize = ms(109);
 
   return (
     <KeyboardAvoidingView
@@ -84,51 +91,47 @@ export function CreatePasswordScreen({ navigation, route }: Props) {
         showsVerticalScrollIndicator={false}
       >
         <View style={[styles.inner, { paddingHorizontal: hs(21) }]}>
-          {/* Back */}
-          <BackButton onPress={() => navigation.goBack()} />
+          <Header
+            onBack={() => navigation.goBack()}
+            title="Create your password"
+            description="At least 8–12 characters"
+          />
 
-          {/* Title */}
-          <View style={{ marginTop: vs(16), alignItems: 'center' }}>
-            <Text style={[styles.title, { color: titleColor, fontSize: fs(16), letterSpacing: -0.32, lineHeight: fs(20), textAlign: 'center' }]}>
-              Create your password
-            </Text>
-            <Text style={[styles.subtitle, { color: subtitleColor, fontSize: fs(12), marginTop: vs(4), textAlign: 'center' }]}>
-              At least 8–12 characters
-            </Text>
-          </View>
-
-          {/* Illustration – dashed ring + inner circle + lock icon */}
-          <View style={[styles.illustrationWrap, { marginTop: vs(24), height: vs(168) }]}>
-            <View style={[
-              styles.illustrationOuter,
-              {
-                width: vs(165),
-                height: vs(165),
-                borderRadius: vs(82),
-                borderColor: isDark ? '#6633CC' : '#D8C4FA',
-                borderStyle: 'dashed',
-              }
-            ]}>
-              <View style={[
-                styles.illustrationInner,
+          {/* Dashed orbit + filled circle + lock glyph (Figma 1:9150) */}
+          <View style={[styles.illustrationWrap, { marginTop: vs(24), height: outerSize }]}>
+            <View
+              style={[
+                styles.illustrationOuter,
                 {
-                  width: vs(109),
-                  height: vs(109),
-                  borderRadius: vs(55),
-                  backgroundColor: isDark ? '#2E1A5E' : '#AFE9D6',
-                  borderColor: isDark ? '#8855DD' : '#D8C4FA',
-                }
-              ]}>
-                <Image
-                  source={LOCK_ICON}
-                  style={{ width: vs(60), height: vs(60) }}
-                  resizeMode="contain"
-                />
+                  width: outerSize,
+                  height: outerSize,
+                  borderRadius: outerSize / 2,
+                  borderColor: outerRing,
+                },
+              ]}
+            >
+              <View
+                style={[
+                  styles.illustrationInner,
+                  {
+                    width: innerSize,
+                    height: innerSize,
+                    borderRadius: innerSize / 2,
+                    backgroundColor: innerBg,
+                    borderColor: innerBorder,
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.25,
+                    shadowRadius: 2,
+                    elevation: 4,
+                  },
+                ]}
+              >
+                <LockGlyph width={ms(40)} height={ms(49)} />
               </View>
             </View>
           </View>
 
-          {/* Password fields */}
           <View style={[styles.form, { marginTop: vs(28) }]}>
             <PasswordInput
               label="Enter password"
@@ -137,8 +140,8 @@ export function CreatePasswordScreen({ navigation, route }: Props) {
               placeholder="••••••••"
             />
 
-            {/* Strength bar */}
-            <View style={{ marginTop: vs(8) }}>
+            {/* Strength checker sits directly under the first password field */}
+            <View style={{ marginTop: vs(8), minHeight: vs(28) }}>
               <PasswordStrengthBar strength={strength} />
             </View>
 
@@ -150,23 +153,17 @@ export function CreatePasswordScreen({ navigation, route }: Props) {
                 setShowMismatch(false);
               }}
               placeholder="••••••••"
-              containerStyle={{ marginTop: vs(16) }}
+              containerStyle={{ marginTop: vs(12) }}
             />
 
-            {/* Error state */}
             {showMismatch && (
               <View style={[styles.errorCard, { marginTop: vs(12) }]}>
                 <Text style={[styles.errorTitle, { fontSize: fs(14) }]}>Error</Text>
-                <Text style={[styles.errorMsg, { fontSize: fs(10) }]}>Password does not match</Text>
+                <Text style={[styles.errorMsg, { fontSize: fs(10) }]}>
+                  Password does not match
+                </Text>
               </View>
             )}
-
-            {/* Hint */}
-            <View style={{ marginTop: vs(16) }}>
-              <Text style={[styles.hint, { color: hintColor, fontSize: fs(10) }]}>
-                {'Your Password should include:\n1 Uppercase letter\n1 Number\n1 Special Character'}
-              </Text>
-            </View>
           </View>
 
           <View style={styles.footer}>
@@ -186,15 +183,13 @@ export function CreatePasswordScreen({ navigation, route }: Props) {
 const styles = StyleSheet.create({
   scroll: { flexGrow: 1 },
   inner: { flex: 1 },
-  backBtn: { width: 32, height: 32, justifyContent: 'center', alignItems: 'flex-start' },
-  title: { fontWeight: '600' },
-  subtitle: { fontWeight: '400' },
   illustrationWrap: {
     alignItems: 'center',
     justifyContent: 'center',
   },
   illustrationOuter: {
     borderWidth: 1,
+    borderStyle: 'dashed',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -226,7 +221,6 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     marginTop: 4,
   },
-  hint: { fontWeight: '400', lineHeight: 16 },
   footer: { marginTop: 'auto', paddingTop: 24, paddingBottom: 8 },
   btnDisabled: { opacity: 0.6 },
 });

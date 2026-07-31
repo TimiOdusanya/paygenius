@@ -174,6 +174,7 @@ export function BudgetCreationScreen({ navigation, route }: Props) {
             Let's Create your Budget
           </Text>
         </View>
+        <View style={{ width: 22 }} />
       </View>
 
       <ScrollView

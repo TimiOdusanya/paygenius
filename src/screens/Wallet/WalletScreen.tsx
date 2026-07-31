@@ -1,6 +1,5 @@
 import React from 'react';
 import {
-  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -28,9 +27,25 @@ type Props = BottomTabScreenProps<MainTabParamList, 'WalletTab'> & {
   >;
 };
 
-function PayGeniusCard({ accountNumber, vs, ms, fs }: {
+/** Stable dot positions (no Math.random in render) */
+const CARD_DOTS = Array.from({ length: 8 }, (_, row) =>
+  Array.from({ length: 12 }, (__, col) => ({
+    left: col * 30 + (row % 2) * 15,
+    top: row * 22,
+    opacity: ((row * 3 + col) % 5) / 8 + 0.2,
+  }))
+).flat();
+
+function PayGeniusCard({
+  accountNumber,
+  width,
+  height,
+  ms,
+  fs,
+}: {
   accountNumber: string;
-  vs: (n: number) => number;
+  width: number;
+  height: number;
   ms: (n: number) => number;
   fs: (n: number) => number;
 }) {
@@ -41,8 +56,8 @@ function PayGeniusCard({ accountNumber, vs, ms, fs }: {
       style={[
         styles.cardContainer,
         {
-          width: 322,
-          height: vs(172),
+          width,
+          height,
           borderRadius: ms(12),
           overflow: 'hidden',
           shadowColor: '#000',
@@ -59,34 +74,28 @@ function PayGeniusCard({ accountNumber, vs, ms, fs }: {
         end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
-      {/* Dot pattern overlay */}
-      <View style={[StyleSheet.absoluteFill, { opacity: 0.3 }]}>
-        {[...Array(8)].map((_, row) =>
-          [...Array(12)].map((__, col) => (
-            <View
-              key={`${row}-${col}`}
-              style={{
-                position: 'absolute',
-                width: 3,
-                height: 3,
-                borderRadius: 1.5,
-                backgroundColor: '#00E5E5',
-                left: col * 30 + (row % 2) * 15,
-                top: row * 22,
-                opacity: Math.random() > 0.5 ? 0.6 : 0.2,
-              }}
-            />
-          ))
-        )}
+      <View style={[StyleSheet.absoluteFill, { opacity: 0.35 }]}>
+        {CARD_DOTS.map((dot, i) => (
+          <View
+            key={i}
+            style={{
+              position: 'absolute',
+              width: 3,
+              height: 3,
+              borderRadius: 1.5,
+              backgroundColor: '#00E5E5',
+              left: dot.left,
+              top: dot.top,
+              opacity: dot.opacity,
+            }}
+          />
+        ))}
       </View>
 
       <View style={{ flex: 1, padding: ms(16), justifyContent: 'space-between' }}>
-        {/* Top row */}
         <Text style={[styles.cardBrand, { color: '#FFFFFF', fontSize: fs(14) }]}>
           PayGenius
         </Text>
-
-        {/* Bottom row */}
         <View style={styles.cardBottom}>
           <Text style={{ color: '#FFFFFF', fontSize: fs(18), fontWeight: '500', letterSpacing: -0.36 }}>
             <Text style={{ fontSize: fs(18) }}>{'**** **** **** '}</Text>
@@ -104,7 +113,7 @@ function PayGeniusCard({ accountNumber, vs, ms, fs }: {
 export function WalletScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { isDark } = useTheme();
-  const { hs, vs, fs, ms } = useResponsive();
+  const { hs, vs, fs, ms, width } = useResponsive();
   const { data: walletData } = useGetWalletQuery();
 
   const wallet = walletData?.data?.wallet;
@@ -118,9 +127,11 @@ export function WalletScreen({ navigation }: Props) {
   const linkedBg = isDark ? '#1E1E2E' : '#FFFFFF';
   const addBtnColor = isDark ? '#7C7CEA' : '#191970';
 
+  const cardWidth = Math.min(hs(322), width - hs(42));
+  const cardHeight = vs(172);
+
   return (
     <View style={[styles.container, { backgroundColor: bg, paddingTop: insets.top }]}>
-      {/* Header */}
       <View style={[styles.header, { paddingHorizontal: hs(21), paddingTop: vs(12) }]}>
         <BackButton onPress={() => navigation.goBack()} />
         <View style={styles.headerCenter}>
@@ -141,32 +152,34 @@ export function WalletScreen({ navigation }: Props) {
         }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Default Account section */}
         <View style={{ marginTop: vs(8) }}>
           <Text style={[styles.sectionTitle, { color: sectionLabel, fontSize: fs(16) }]}>
             Default Account
           </Text>
-          <Text style={[styles.sectionSub, { color: textSecondary, fontSize: fs(10), letterSpacing: 0 }]}>
+          <Text style={[styles.sectionSub, { color: textSecondary, fontSize: fs(10) }]}>
             Alternative Accounts
           </Text>
         </View>
 
-        {/* PayGenius VISA Card */}
         <View style={{ marginTop: vs(12), alignItems: 'center' }}>
-          <PayGeniusCard accountNumber={accountNumber} vs={vs} ms={ms} fs={fs} />
+          <PayGeniusCard
+            accountNumber={accountNumber}
+            width={cardWidth}
+            height={cardHeight}
+            ms={ms}
+            fs={fs}
+          />
         </View>
 
-        {/* Linked accounts section */}
         <View style={{ marginTop: vs(16) }}>
           <Text style={[styles.sectionTitle, { color: sectionLabel, fontSize: fs(16) }]}>
             Linked accounts
           </Text>
-          <Text style={[styles.sectionSub, { color: textSecondary, fontSize: fs(10), letterSpacing: 0 }]}>
+          <Text style={[styles.sectionSub, { color: textSecondary, fontSize: fs(10) }]}>
             Alternative Accounts
           </Text>
         </View>
 
-        {/* Linked account row */}
         <View
           style={[
             styles.linkedRow,
@@ -202,7 +215,6 @@ export function WalletScreen({ navigation }: Props) {
           </Text>
         </View>
 
-        {/* Add debit card button - right aligned */}
         <View style={[styles.addBtnRow, { marginTop: vs(12) }]}>
           <Pressable
             onPress={() => (navigation as any).navigate('AddDebitCard')}
@@ -225,7 +237,6 @@ export function WalletScreen({ navigation }: Props) {
         </View>
       </ScrollView>
 
-      {/* Continue button */}
       <View style={{ paddingHorizontal: hs(21), paddingBottom: Math.max(insets.bottom, vs(16)) }}>
         <PrimaryButton title="Continue" onPress={() => {}} />
       </View>

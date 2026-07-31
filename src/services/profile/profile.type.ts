@@ -12,10 +12,17 @@ export type ProfileSetupPayload = {
   profilePicture?: string;
 };
 
+export type CheckUsernameResponse = {
+  username: string;
+  available: boolean;
+  reason: 'available' | 'taken' | 'invalid';
+};
+
 export type VerifyIdentityPayload = {
   type: 'BVN' | 'NIN';
   number: string;
-  phoneNumber: string;
+  /** Required for BVN only */
+  phoneNumber?: string;
 };
 
 export type UploadSelfiePayload = { selfieImages: string[] };

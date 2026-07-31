@@ -16,9 +16,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/RootNavigator';
 import { PrimaryButton } from '@/components/PrimaryButton';
-import { BackButton } from '@/components/BackButton';
+import { Header } from '@/components/Header';
 import { useTheme } from '@/context/ThemeContext';
 import { useResponsive } from '@/hooks/useResponsive';
+import { useTrackOnboardingRoute } from '@/hooks/useTrackOnboardingRoute';
 import { useGoogleAuth } from '@/hooks/useGoogleAuth';
 import { signInWithApple, isAppleSignInAvailable } from '@/hooks/useAppleAuth';
 import {
@@ -26,12 +27,16 @@ import {
   useGoogleCodeMutation,
   useAppleAuthMutation,
 } from '@/services/auth/auth.query';
+import { navigateAfterAuth } from '@/navigation/navigateAfterAuth';
+import { usePreferencesStore } from '@/stores/preferences.store';
+import { getApiErrorMessage } from '@/utils/errors';
 import GoogleLogo from '../../../assets/images/auth/google-logo.svg';
 import AppleLogo from '../../../assets/images/auth/apple-logo.svg';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
 export function LoginScreen({ navigation }: Props) {
+  useTrackOnboardingRoute('Login');
   const insets = useSafeAreaInsets();
   const { isDark } = useTheme();
   const { hs, vs, fs, ms } = useResponsive();
@@ -40,7 +45,6 @@ export function LoginScreen({ navigation }: Props) {
 
   const bg = isDark ? '#1A1A1A' : '#FAFAFC';
   const titleColor = isDark ? '#FFFFFF' : '#191970';
-  const subtitleColor = isDark ? '#CCCCCC' : '#858585';
   const inputBg = isDark ? '#2A2A2A' : '#FAFAFC';
   const inputBorder = isDark ? '#3B3B3B' : '#191970';
   const inputText = isDark ? '#FFFFFF' : '#000000';
@@ -68,11 +72,17 @@ export function LoginScreen({ navigation }: Props) {
     sendVerification.mutate(
       { phoneNumber: fullPhoneNumber },
       {
-        onSuccess: () =>
-          navigation.navigate('OTPVerification', { phoneNumber: fullPhoneNumber }),
-        onError: (err: any) => {
-          const msg = err?.response?.data?.message ?? 'Failed to send verification code.';
-          Alert.alert('Error', msg);
+        onSuccess: () => {
+          usePreferencesStore
+            .getState()
+            .setRegistrationProgress(fullPhoneNumber, 'OTPVerification');
+          navigation.navigate('OTPVerification', { phoneNumber: fullPhoneNumber });
+        },
+        onError: (err) => {
+          Alert.alert(
+            'Error',
+            getApiErrorMessage(err, 'Failed to send verification code. Please try again.')
+          );
         },
       }
     );
@@ -87,9 +97,12 @@ export function LoginScreen({ navigation }: Props) {
       googleCodeMutation.mutate(
         { code: result.code, redirectUri: result.redirectUri },
         {
-          onSuccess: () => navigation.replace('Main'),
-          onError: (err: any) => {
-            Alert.alert('Error', err?.response?.data?.message ?? 'Google authentication failed.');
+          onSuccess: () => navigateAfterAuth(navigation),
+          onError: (err) => {
+            Alert.alert(
+              'Error',
+              getApiErrorMessage(err, 'Google authentication failed. Please try again.')
+            );
           },
         }
       );
@@ -113,9 +126,12 @@ export function LoginScreen({ navigation }: Props) {
     appleAuthMutation.mutate(
       { identityToken: result.identityToken, fullName: result.fullName },
       {
-        onSuccess: () => navigation.replace('Main'),
-        onError: (err: any) => {
-          Alert.alert('Error', err?.response?.data?.message ?? 'Apple authentication failed.');
+        onSuccess: () => navigateAfterAuth(navigation),
+        onError: (err) => {
+          Alert.alert(
+            'Error',
+            getApiErrorMessage(err, 'Apple authentication failed. Please try again.')
+          );
         },
       }
     );
@@ -141,21 +157,11 @@ export function LoginScreen({ navigation }: Props) {
         showsVerticalScrollIndicator={false}
       >
         <View style={[styles.inner, { paddingHorizontal: hs(21) }]}>
-          {/* Header */}
-          <View style={styles.headerRow}>
-            <BackButton onPress={() => navigation.goBack()} />
-            <View style={{ flex: 1 }} />
-          </View>
-
-          {/* Title */}
-          <View style={[styles.titleBlock, { marginTop: vs(16) }]}>
-            <Text style={[styles.title, { color: titleColor, fontSize: fs(16), letterSpacing: -0.32, lineHeight: fs(20) }]}>
-              Create an account
-            </Text>
-            <Text style={[styles.subtitle, { color: subtitleColor, fontSize: fs(12), marginTop: vs(2) }]}>
-              Choose sign up method
-            </Text>
-          </View>
+          <Header
+            onBack={() => navigation.goBack()}
+            title="Welcome back"
+            description="Sign in to continue"
+          />
 
           {/* Sign up section */}
           <View style={[styles.form, { marginTop: vs(30) }]}>
@@ -284,11 +290,6 @@ export function LoginScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   scroll: { flexGrow: 1 },
   inner: { flex: 1 },
-  headerRow: { flexDirection: 'row', alignItems: 'center' },
-  backBtn: { width: 32, height: 32, justifyContent: 'center', alignItems: 'flex-start' },
-  titleBlock: {},
-  title: { fontWeight: '600' },
-  subtitle: { fontWeight: '400' },
   form: {},
   fieldLabel: { fontWeight: '400' },
   phoneRow: { flexDirection: 'row', alignItems: 'center' },
