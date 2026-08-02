@@ -8,6 +8,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -25,6 +26,17 @@ import { navigateAfterAuth } from '@/navigation/navigateAfterAuth';
 import { useAuthStore } from '@/stores';
 import { getApiErrorMessage } from '@/utils/errors';
 
+/** Convert a local Nigerian phone entry to E.164 so the backend finds the account */
+function buildIdentifier(input: string, mode: 'phone' | 'other'): string {
+  if (mode !== 'phone') return input.trim();
+  const digits = input.replace(/\D/g, '');
+  if (!digits) return input.trim();
+  if (digits.startsWith('0') && digits.length === 11) return `+234${digits.slice(1)}`;
+  if (digits.length === 10) return `+234${digits}`;
+  if (digits.startsWith('234') && digits.length === 13) return `+${digits}`;
+  return `+${digits}`;
+}
+
 const FINGERPRINT_IMG = require('../../../assets/images/auth/fingerprint.png');
 const FACEID_IMG = require('../../../assets/images/auth/faceid-icon.png');
 
@@ -37,7 +49,10 @@ export function LoginWithPasswordScreen({ navigation }: Props) {
   const { isDark } = useTheme();
   const { hs, vs, fs, ms } = useResponsive();
 
-  const [identifier, setIdentifier] = useState('');
+  const [phoneInput, setPhoneInput] = useState('');
+  // 'phone' shows the NGN flag+prefix input; 'other' shows a plain email/username field
+  const [inputMode, setInputMode] = useState<'phone' | 'other'>('phone');
+  const [otherInput, setOtherInput] = useState('');
   const [password, setPassword] = useState('');
   const [hasBiometrics, setHasBiometrics] = useState(false);
   const [biometricType, setBiometricType] = useState<BiometricType>(null);
@@ -102,13 +117,21 @@ export function LoginWithPasswordScreen({ navigation }: Props) {
   };
 
   const handleLogin = () => {
-    // When user is known use cached phone; otherwise use what they typed
-    const loginIdentifier = hasKnownUser ? cachedPhone! : identifier.trim();
+    let loginIdentifier: string;
+    if (hasKnownUser) {
+      loginIdentifier = cachedPhone!;
+    } else if (inputMode === 'phone') {
+      loginIdentifier = buildIdentifier(phoneInput, 'phone');
+    } else {
+      loginIdentifier = otherInput.trim();
+    }
+
     if (!loginIdentifier) {
       Alert.alert('Required', 'Please enter your phone number, email, or username.');
       return;
     }
     if (password.length < 6) return;
+
     loginMutation.mutate(
       { identifier: loginIdentifier, password },
       {
@@ -123,10 +146,13 @@ export function LoginWithPasswordScreen({ navigation }: Props) {
   const isLoading = loginMutation.isPending || loginBiometricMutation.isPending;
   const displayName = user?.firstName ?? '';
 
-  // Button enabled when: known user → just need password; unknown → need both fields
+  const identifierFilled = inputMode === 'phone'
+    ? phoneInput.replace(/\D/g, '').length >= 10
+    : otherInput.trim().length >= 3;
+
   const canSubmit = hasKnownUser
     ? password.length >= 6
-    : identifier.trim().length >= 3 && password.length >= 6;
+    : identifierFilled && password.length >= 6;
 
   return (
     <KeyboardAvoidingView
@@ -177,23 +203,84 @@ export function LoginWithPasswordScreen({ navigation }: Props) {
             </View>
           )}
 
-          {/* Identifier field — shown only when the device has no cached user */}
+          {/* Identifier section — only when device has no cached user */}
           {!hasKnownUser && (
             <View style={{ marginTop: vs(24), width: '100%' }}>
-              <Text style={[styles.noAccountNote, { color: subtitleColor, fontSize: fs(12) }]}>
-                Enter your phone number, email, or username to log in.
-              </Text>
-              <View style={{ marginTop: vs(12) }}>
+              {inputMode === 'phone' ? (
+                <>
+                  <Text style={[styles.fieldLabel, { color: isDark ? '#CCCCCC' : '#1A1D23', fontSize: fs(10) }]}>
+                    Phone number
+                  </Text>
+                  <View style={[styles.phoneRow, { marginTop: vs(8), gap: hs(6) }]}>
+                    {/* Country flag + code badge */}
+                    <View
+                      style={[
+                        styles.flagBadge,
+                        {
+                          backgroundColor: isDark ? '#2A2A5A' : '#C0C0F1',
+                          borderColor: isDark ? '#3B3B3B' : '#191970',
+                          borderRadius: ms(12),
+                          height: vs(44),
+                          paddingHorizontal: hs(12),
+                          minWidth: ms(73),
+                        },
+                      ]}
+                    >
+                      <Text style={{ fontSize: ms(14) }}>🇳🇬</Text>
+                      <Text style={[styles.flagCode, { color: '#FFFFFF', fontSize: fs(11) }]}>+234</Text>
+                    </View>
+
+                    {/* Local number input */}
+                    <TextInput
+                      style={[
+                        styles.phoneInput,
+                        {
+                          flex: 1,
+                          borderColor: isDark ? '#3B3B3B' : '#191970',
+                          backgroundColor: isDark ? '#1E1E2E' : '#FAFAFC',
+                          color: isDark ? '#FFFFFF' : '#1A1D23',
+                          fontSize: fs(11),
+                          height: vs(44),
+                          borderRadius: ms(12),
+                          paddingHorizontal: hs(14),
+                          borderWidth: 0.4,
+                        },
+                      ]}
+                      value={phoneInput}
+                      onChangeText={setPhoneInput}
+                      placeholder="8012345678"
+                      placeholderTextColor={isDark ? '#666' : '#C4C4C4'}
+                      keyboardType="phone-pad"
+                      maxLength={11}
+                    />
+                  </View>
+                </>
+              ) : (
                 <FormInput
-                  label="Phone / Email / Username"
-                  value={identifier}
-                  onChangeText={setIdentifier}
-                  placeholder="+2348012345678 or you@email.com"
+                  label="Email or Username"
+                  value={otherInput}
+                  onChangeText={setOtherInput}
+                  placeholder="you@email.com or @username"
                   autoCapitalize="none"
                   keyboardType="email-address"
                   autoCorrect={false}
                 />
-              </View>
+              )}
+
+              {/* Toggle between phone and email/username */}
+              <Pressable
+                onPress={() => {
+                  setInputMode((m) => (m === 'phone' ? 'other' : 'phone'));
+                  setPhoneInput('');
+                  setOtherInput('');
+                }}
+                style={{ marginTop: vs(8), alignSelf: 'flex-end' }}
+                hitSlop={8}
+              >
+                <Text style={[styles.toggleLink, { color: isDark ? '#A0A0FF' : '#191970', fontSize: fs(11) }]}>
+                  {inputMode === 'phone' ? 'Use email or username instead' : 'Use phone number instead'}
+                </Text>
+              </Pressable>
             </View>
           )}
 
@@ -278,7 +365,12 @@ const styles = StyleSheet.create({
   avatarWrap: { alignItems: 'center' },
   avatarCircle: { alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   userName: { fontWeight: '500', textAlign: 'center' },
-  noAccountNote: { textAlign: 'center', fontWeight: '400', lineHeight: 20 },
+  fieldLabel: { fontWeight: '400' },
+  phoneRow: { flexDirection: 'row', alignItems: 'center' },
+  flagBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 0.4, justifyContent: 'center' },
+  flagCode: { fontWeight: '400' },
+  phoneInput: { fontWeight: '400' },
+  toggleLink: { fontWeight: '400', textDecorationLine: 'underline' },
   biometricWrap: { alignItems: 'center', width: '100%' },
   biometricLabel: { fontWeight: '400', textAlign: 'center' },
   fingerprintBtn: { alignItems: 'center', justifyContent: 'center' },
