@@ -8,7 +8,11 @@ import { useResponsive } from '@/hooks/useResponsive';
 import { ScreenTitleBar } from '@/components/ScreenTitleBar';
 import { SettingsRow } from '@/components/SettingsRow';
 import type { RootStackParamList } from '@/navigation/RootNavigator';
-import { useGetSettingsQuery, useUpdateSettingsMutation } from '@/services/settings/settings.query';
+import {
+  useGetSettingsQuery,
+  useSetBiometricMutation,
+  useUpdateSettingsMutation,
+} from '@/services/settings/settings.query';
 import FaceIdIcon from '../../../assets/images/settings/icon-faceid.svg';
 import PinIcon from '../../../assets/images/settings/icon-pin.svg';
 import BioIcon from '../../../assets/images/settings/icon-biometrics.svg';
@@ -22,6 +26,7 @@ export function SecurityCenterScreen({ navigation }: Props) {
   const { hs, vs, ms } = useResponsive();
   const { data } = useGetSettingsQuery();
   const update = useUpdateSettingsMutation();
+  const setBiometric = useSetBiometricMutation();
   const settings = data?.data?.settings;
   const bg = isDark ? '#1A1A1A' : '#FAFAFC';
 
@@ -33,7 +38,11 @@ export function SecurityCenterScreen({ navigation }: Props) {
     update.mutate({ faceIdEnabled: false });
   };
 
-  const openBiometrics = async () => {
+  const toggleBiometrics = async (next: boolean) => {
+    if (!next) {
+      setBiometric.mutate(false);
+      return;
+    }
     try {
       const enrolled = await LocalAuthentication.isEnrolledAsync();
       if (!enrolled) {
@@ -43,8 +52,14 @@ export function SecurityCenterScreen({ navigation }: Props) {
         );
         return;
       }
-    } catch {}
-    navigation.navigate('FaceIdSetup');
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: 'Enable biometrics for PayGenius',
+      });
+      if (!result.success) return;
+      setBiometric.mutate(true);
+    } catch {
+      navigation.navigate('FaceIdSetup');
+    }
   };
 
   return (
@@ -96,7 +111,8 @@ export function SecurityCenterScreen({ navigation }: Props) {
           }
           title="Biometrics"
           subtitle="Manage your Finger Print"
-          onPress={openBiometrics}
+          switchValue={settings?.biometricEnabled ?? false}
+          onSwitchChange={toggleBiometrics}
         />
         <SettingsRow
           icon={

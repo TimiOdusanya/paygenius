@@ -11,6 +11,7 @@ import { SETTINGS_ENDPOINTS } from './settings.endpoints';
 import {
   changePasswordAPI,
   changePinAPI,
+  deactivateAccountAPI,
   deleteAccountAPI,
   getReferralsAPI,
   getSettingsAPI,
@@ -86,6 +87,13 @@ export function useSetBiometricMutation() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: SETTINGS_ENDPOINTS.GET.QUERY_KEY });
     },
+  });
+}
+
+export function useDeactivateAccountMutation() {
+  return useMutation({
+    mutationKey: SETTINGS_ENDPOINTS.DEACTIVATE.MUTATION_KEY,
+    mutationFn: deactivateAccountAPI,
   });
 }
 

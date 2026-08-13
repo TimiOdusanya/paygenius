@@ -1,11 +1,15 @@
-const iosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
-const iosUrlScheme = iosClientId
-  ? `com.googleusercontent.apps.${iosClientId.replace(/\.apps\.googleusercontent\.com$/, '')}`
-  : undefined;
+const googleClientId =
+  process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ||
+  process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID;
+const iosUrlScheme = googleClientId
+  ? `com.googleusercontent.apps.${googleClientId.replace(/\.apps\.googleusercontent\.com$/, '')}`
+  : 'com.googleusercontent.apps.placeholder';
 
-const googleSignInPlugin = iosUrlScheme
-  ? ['@react-native-google-signin/google-signin', { iosUrlScheme }]
-  : '@react-native-google-signin/google-signin';
+// Always pass iosUrlScheme so the plugin skips Firebase / google-services.json
+const googleSignInPlugin = [
+  '@react-native-google-signin/google-signin',
+  { iosUrlScheme },
+];
 
 module.exports = {
   expo: {
@@ -25,6 +29,12 @@ module.exports = {
       supportsTablet: true,
       bundleIdentifier: 'com.paygenius.app',
       usesAppleSignIn: true,
+      infoPlist: {
+        NSMicrophoneUsageDescription:
+          'Allow PayGenius to record voice notes for Genie.',
+        NSPhotoLibraryUsageDescription:
+          'Allow PayGenius to access your photos.',
+      },
     },
     android: {
       adaptiveIcon: {
@@ -38,8 +48,24 @@ module.exports = {
     web: {
       favicon: './assets/favicon.png',
     },
+    extra: {
+      eas: {
+        projectId: '26a4c2a1-42af-4ddb-8059-87daa11db8bd',
+      },
+    },
     scheme: 'paygenius',
     plugins: [
+      'expo-font',
+      'expo-system-ui',
+      [
+        'expo-build-properties',
+        {
+          android: {
+            enablePngCrunchInReleaseBuilds: false,
+            usesCleartextTraffic: true,
+          },
+        },
+      ],
       '@react-native-community/datetimepicker',
       'expo-apple-authentication',
       [
@@ -55,11 +81,18 @@ module.exports = {
           photosPermission: 'Allow PayGenius to access your photos.',
         },
       ],
+      [
+        'expo-av',
+        {
+          microphonePermission:
+            'Allow PayGenius to record voice notes for Genie.',
+        },
+      ],
       'expo-web-browser',
       [
         'expo-notifications',
         {
-          icon: './assets/icon.png',
+          icon: './assets/images/notifications/notification-icon.png',
           color: '#191970',
           sounds: [],
         },

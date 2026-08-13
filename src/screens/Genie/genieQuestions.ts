@@ -32,12 +32,12 @@ export const SPEND_OPTIONS = [
   'Entertainment',
   'Family or friends',
   'Savings / Investments',
+  'Bills (electricity, data, subscriptions)',
 ];
 
 export const TRACKING_OPTIONS = [
   'Always — I’m basically an accountant',
   'Most times, I try to',
-  'Bills (electricity, data, subscriptions)',
   'Sometimes',
   'Rarely',
   'Never (I just pray I don’t go broke)',

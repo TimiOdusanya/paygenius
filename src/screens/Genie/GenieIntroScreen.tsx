@@ -42,7 +42,7 @@ export function GenieIntroScreen({ onBack, onContinue }: Props) {
           paddingHorizontal: hs(24),
         }}
       >
-        Hey there  Let’s get to know you
+        Hey there{'\n'}Let’s get to know you
       </Text>
       <Text
         style={{

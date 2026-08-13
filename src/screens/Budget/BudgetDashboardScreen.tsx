@@ -48,9 +48,10 @@ interface BudgetGridCardProps {
   vs: (n: number) => number;
   fs: (n: number) => number;
   hs: (n: number) => number;
+  onPress?: () => void;
 }
 
-function BudgetGridCard({ budget, isDark, ms, vs, fs }: BudgetGridCardProps) {
+function BudgetGridCard({ budget, isDark, ms, vs, fs, onPress }: BudgetGridCardProps) {
   const cat = (budget.category ?? 'default').toUpperCase();
   const iconName = BUDGET_ICONS[cat] ?? BUDGET_ICONS.default;
   const borderColor = BUDGET_BORDER_COLORS[cat] ?? BUDGET_BORDER_COLORS.default;
@@ -61,7 +62,9 @@ function BudgetGridCard({ budget, isDark, ms, vs, fs }: BudgetGridCardProps) {
   const subColor = '#858585';
 
   return (
-    <View style={[
+    <Pressable
+      onPress={onPress}
+      style={[
       styles.gridCard,
       {
         backgroundColor: cardBg,
@@ -96,7 +99,7 @@ function BudgetGridCard({ budget, isDark, ms, vs, fs }: BudgetGridCardProps) {
       <Text style={[styles.progressPercent, { color: subColor, fontSize: fs(10), marginTop: vs(4) }]}>
         {progress}%
       </Text>
-    </View>
+    </Pressable>
   );
 }
 
@@ -147,9 +150,37 @@ export function BudgetDashboardScreen({ navigation }: Props) {
             {/* Budget grid */}
             {pairs.map(([left, right], idx) => (
               <View key={idx} style={styles.gridRow}>
-                <BudgetGridCard budget={left} isDark={isDark} ms={ms} vs={vs} fs={fs} hs={hs} />
+                <BudgetGridCard
+                  budget={left}
+                  isDark={isDark}
+                  ms={ms}
+                  vs={vs}
+                  fs={fs}
+                  hs={hs}
+                  onPress={() =>
+                    navigation.navigate('TransferHub', {
+                      source: 'BUDGET',
+                      budgetId: left._id,
+                      budgetName: left.name,
+                    })
+                  }
+                />
                 {right ? (
-                  <BudgetGridCard budget={right} isDark={isDark} ms={ms} vs={vs} fs={fs} hs={hs} />
+                  <BudgetGridCard
+                    budget={right}
+                    isDark={isDark}
+                    ms={ms}
+                    vs={vs}
+                    fs={fs}
+                    hs={hs}
+                    onPress={() =>
+                      navigation.navigate('TransferHub', {
+                        source: 'BUDGET',
+                        budgetId: right._id,
+                        budgetName: right.name,
+                      })
+                    }
+                  />
                 ) : (
                   <View style={{ flex: 1, margin: ms(5) }} />
                 )}

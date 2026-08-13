@@ -59,3 +59,16 @@ export { SUPPORT_ENDPOINTS } from './support/support.endpoints';
 export * from './support/support.api';
 export * from './support/support.query';
 export type * from './support/support.type';
+
+export { TRANSFER_ENDPOINTS } from './transfer/transfer.endpoints';
+export * from './transfer/transfer.api';
+export * from './transfer/transfer.query';
+export type {
+  TransferRail,
+  TransferUser,
+  TransferBeneficiary,
+  ResolvedTransferAccount,
+  TransferRecord,
+  TransferDraft,
+  SendTransferPayload,
+} from './transfer/transfer.type';

@@ -1,7 +1,12 @@
 import { paygeniusAPI } from '../api/http';
 import { GENIE_ENDPOINTS } from './genie.endpoints';
 import type { ApiResponse } from '@/types';
-import type { GenieChat, GenieChatPreview, GenieProfile } from './genie.type';
+import type {
+  GenieChat,
+  GenieChatPreview,
+  GenieMessagePayload,
+  GenieProfile,
+} from './genie.type';
 
 export const getGenieProfileAPI = async (): Promise<
   ApiResponse<{ profile: GenieProfile | null; onboardingCompleted: boolean }>
@@ -40,10 +45,12 @@ export const createGenieChatAPI = async (): Promise<
 
 export const sendGenieMessageAPI = async (
   chatId: string,
-  content: string
+  payload: GenieMessagePayload
 ): Promise<ApiResponse<{ chat: GenieChat }>> => {
-  const response = await paygeniusAPI.post(GENIE_ENDPOINTS.MESSAGE.ROUTE(chatId), {
-    content,
-  });
+  const response = await paygeniusAPI.post(
+    GENIE_ENDPOINTS.MESSAGE.ROUTE(chatId),
+    payload,
+    { timeout: 60000 }
+  );
   return response.data;
 };

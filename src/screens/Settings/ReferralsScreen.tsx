@@ -22,8 +22,8 @@ import CopyIcon from '../../../assets/images/settings/icon-copy.svg';
 type Props = NativeStackScreenProps<RootStackParamList, 'Referrals'>;
 
 const STEPS = [
-  '1. Share Invitation link/code with friends',
-  '2. Friend Transacts during the validity period',
+  'Share Invitation link/code with friends',
+  '2.Friend Transacts during the validity period',
   '3.You’ll receive rewards in your wallet',
 ];
 

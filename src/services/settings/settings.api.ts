@@ -60,6 +60,15 @@ export const setBiometricAPI = async (
   return response.data;
 };
 
+export const deactivateAccountAPI = async (): Promise<
+  ApiResponse<{ deactivated: boolean }>
+> => {
+  const response = await paygeniusAPI.post<ApiResponse<{ deactivated: boolean }>>(
+    SETTINGS_ENDPOINTS.DEACTIVATE.ROUTE
+  );
+  return response.data;
+};
+
 export const deleteAccountAPI = async (
   password?: string
 ): Promise<ApiResponse<{ deleted: boolean }>> => {

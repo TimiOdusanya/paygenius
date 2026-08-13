@@ -13,6 +13,7 @@ type Props = {
   balanceLabel: string;
   onToggleBalance: () => void;
   onPayBills?: () => void;
+  onTransfer?: () => void;
   hs: (n: number) => number;
   fs: (n: number) => number;
   ms: (n: number) => number;
@@ -23,6 +24,7 @@ export function HomeBalanceCard({
   balanceLabel,
   onToggleBalance,
   onPayBills,
+  onTransfer,
   hs,
   fs,
   ms,
@@ -62,7 +64,10 @@ export function HomeBalanceCard({
       </Pressable>
 
       <View style={[styles.btnsRow, { paddingHorizontal: hs(24), paddingBottom: 14 }]}>
-        <Pressable style={[styles.btn, { width: btnW, borderColor: '#F5F5F5' }]}>
+        <Pressable
+          onPress={onTransfer}
+          style={[styles.btn, { width: btnW, borderColor: '#F5F5F5' }]}
+        >
           <WalletAdd width={ms(24)} height={ms(24)} />
           <Text style={[styles.btnText, { color: '#FFFFFF', fontSize: fs(10) }]}>
             Transfer +

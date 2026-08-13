@@ -75,7 +75,7 @@ export function FaceIdSetupScreen({ navigation }: Props) {
       >
         <ScreenTitleBar
           title="Face ID"
-          subtitle="Set  your face ID"
+          subtitle="Set your face ID"
           onBack={() => navigation.goBack()}
         />
       </View>

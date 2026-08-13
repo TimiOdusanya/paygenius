@@ -12,12 +12,15 @@ import {
   saveGenieProfileAPI,
   sendGenieMessageAPI,
 } from './genie.api';
-import type { GenieProfile } from './genie.type';
+import type { GenieMessagePayload, GenieProfile } from './genie.type';
+import { useAuthStore } from '@/stores';
 
 export function useGetGenieProfileQuery() {
+  const token = useAuthStore((s) => s.token);
   return useQuery({
     queryKey: GENIE_ENDPOINTS.PROFILE.QUERY_KEY,
     queryFn: getGenieProfileAPI,
+    enabled: !!token,
   });
 }
 
@@ -33,9 +36,11 @@ export function useSaveGenieProfileMutation() {
 }
 
 export function useListGenieChatsQuery() {
+  const token = useAuthStore((s) => s.token);
   return useQuery({
     queryKey: GENIE_ENDPOINTS.CHATS.QUERY_KEY,
     queryFn: listGenieChatsAPI,
+    enabled: !!token,
   });
 }
 
@@ -63,18 +68,15 @@ export function useSendGenieMessageMutation() {
     mutationKey: GENIE_ENDPOINTS.MESSAGE.MUTATION_KEY,
     mutationFn: async ({
       chatId,
-      content,
-    }: {
-      chatId: string | null;
-      content: string;
-    }) => {
+      ...payload
+    }: GenieMessagePayload & { chatId: string | null }) => {
       let id = chatId;
       if (!id) {
         const created = await createGenieChatAPI();
         id = created.data?.chat?._id ?? null;
         if (!id) throw new Error('Could not start a chat');
       }
-      const sent = await sendGenieMessageAPI(id, content);
+      const sent = await sendGenieMessageAPI(id, payload);
       return { ...sent, chatId: id };
     },
     onSuccess: (data) => {

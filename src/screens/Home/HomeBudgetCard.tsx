@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { Budget } from '@/types';
 
@@ -30,9 +30,10 @@ type Props = {
   isDark: boolean;
   ms: (n: number) => number;
   fs: (n: number) => number;
+  onPress?: () => void;
 };
 
-export function HomeBudgetCard({ budget, isDark, ms, fs }: Props) {
+export function HomeBudgetCard({ budget, isDark, ms, fs, onPress }: Props) {
   const cat = budget.category?.toUpperCase() || 'default';
   const accent = BUDGET_COLORS[cat] || BUDGET_COLORS.default;
   const iconName = BUDGET_ICONS[cat] || BUDGET_ICONS.default;
@@ -45,7 +46,8 @@ export function HomeBudgetCard({ budget, isDark, ms, fs }: Props) {
   const size = ms(93);
 
   return (
-    <View
+    <Pressable
+      onPress={onPress}
       style={[
         styles.card,
         {
@@ -90,7 +92,7 @@ export function HomeBudgetCard({ budget, isDark, ms, fs }: Props) {
           {progress}%
         </Text>
       </View>
-    </View>
+    </Pressable>
   );
 }
 

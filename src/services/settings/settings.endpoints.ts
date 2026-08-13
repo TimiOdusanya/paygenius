@@ -19,6 +19,10 @@ export const SETTINGS_ENDPOINTS = {
     ROUTE: '/api/settings/account',
     MUTATION_KEY: ['settings', 'delete-account'] as const,
   },
+  DEACTIVATE: {
+    ROUTE: '/api/settings/account/deactivate',
+    MUTATION_KEY: ['settings', 'deactivate-account'] as const,
+  },
   REFERRALS: {
     ROUTE: '/api/settings/referrals',
     QUERY_KEY: ['settings', 'referrals'] as const,

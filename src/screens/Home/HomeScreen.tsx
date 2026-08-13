@@ -173,6 +173,7 @@ export function HomeScreen({ navigation }: Props) {
           balanceLabel={balanceVisible ? formatBalance(balance) : '₦*****'}
           onToggleBalance={() => setBalanceVisible((v) => !v)}
           onPayBills={() => navigation.navigate('PayBills')}
+          onTransfer={() => navigation.navigate('TransferHub')}
           hs={hs}
           fs={fs}
           ms={ms}
@@ -321,6 +322,13 @@ export function HomeScreen({ navigation }: Props) {
                 isDark={isDark}
                 ms={ms}
                 fs={fs}
+                onPress={() =>
+                  navigation.navigate('TransferHub', {
+                    source: 'BUDGET',
+                    budgetId: b._id,
+                    budgetName: b.name,
+                  })
+                }
               />
             ))
           )}

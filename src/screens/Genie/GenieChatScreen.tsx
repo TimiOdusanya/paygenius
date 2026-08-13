@@ -17,14 +17,22 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/context/ThemeContext';
 import { useResponsive } from '@/hooks/useResponsive';
 import { useAuthStore } from '@/stores';
-import { BackButton } from '@/components/BackButton';
+import { ScreenTitleBar } from '@/components/ScreenTitleBar';
 import { EmptyState } from '@/components/EmptyState';
 import {
+  useCreateGenieChatMutation,
   useGetGenieChatQuery,
   useListGenieChatsQuery,
   useSendGenieMessageMutation,
 } from '@/services/genie/genie.query';
-import type { GenieMessage } from '@/services/genie/genie.type';
+import type { GenieAttachment, GenieMessage } from '@/services/genie/genie.type';
+import { GenieTypingBubble } from '@/components/GenieTypingBubble';
+import { VoiceNoteBubble } from '@/components/VoiceNoteBubble';
+import { formatDuration, uriToDataUri } from './genieMedia';
+import { getApiErrorMessage } from '@/utils/errors';
+import * as ImagePicker from 'expo-image-picker';
+import { Audio } from 'expo-av';
+import { Ionicons } from '@expo/vector-icons';
 import MenuIcon from '../../../assets/images/genie/menu.svg';
 import SendIcon from '../../../assets/images/genie/send.svg';
 import MicIcon from '../../../assets/images/genie/mic.svg';
@@ -32,9 +40,19 @@ import GalleryIcon from '../../../assets/images/genie/gallery.svg';
 import NewChatIcon from '../../../assets/images/genie/new-chat.svg';
 import LibraryIcon from '../../../assets/images/genie/library.svg';
 
-const AVATAR = require('../../../assets/images/genie/chat-avatar.png');
+const GENIE_AVATAR = require('../../../assets/images/genie/chat-avatar.png');
+const USER_AVATAR = require('../../../assets/images/profile/avatar-default.png');
 
 type DrawerView = 'chats' | 'library';
+
+type DraftImage = { previewUri: string; dataUri: string; mimeType: string };
+type DraftAudio = { dataUri: string; mimeType: string; durationMs: number };
+type PendingSend = {
+  content: string;
+  imageUri?: string;
+  audioUri?: string;
+  durationMs?: number;
+};
 
 type Props = {
   onBack: () => void;
@@ -48,7 +66,13 @@ export function GenieChatScreen({ onBack }: Props) {
   const [chatId, setChatId] = React.useState<string | null>(null);
   const [composeNew, setComposeNew] = React.useState(false);
   const [draft, setDraft] = React.useState('');
-  const [pending, setPending] = React.useState<string | null>(null);
+  const [draftImage, setDraftImage] = React.useState<DraftImage | null>(null);
+  const [draftAudio, setDraftAudio] = React.useState<DraftAudio | null>(null);
+  const [pending, setPending] = React.useState<PendingSend | null>(null);
+  const [recording, setRecording] = React.useState(false);
+  const [recordMs, setRecordMs] = React.useState(0);
+  const recordingRef = React.useRef<Audio.Recording | null>(null);
+  const recordTimer = React.useRef<ReturnType<typeof setInterval> | null>(null);
   const [drawerOpen, setDrawerOpen] = React.useState(false);
   const [drawerView, setDrawerView] = React.useState<DrawerView>('chats');
   const [search, setSearch] = React.useState('');
@@ -57,6 +81,7 @@ export function GenieChatScreen({ onBack }: Props) {
   const { data: listData, isLoading: listLoading } = useListGenieChatsQuery();
   const { data: chatData, isLoading: chatLoading } = useGetGenieChatQuery(chatId);
   const sendMutation = useSendGenieMessageMutation();
+  const createChat = useCreateGenieChatMutation();
 
   const chats = listData?.data?.chats ?? [];
   const chat = chatData?.data?.chat ?? null;
@@ -77,10 +102,16 @@ export function GenieChatScreen({ onBack }: Props) {
 
   React.useEffect(() => {
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
-  }, [messages.length, pending]);
+  }, [messages.length, pending, sendMutation.isPending, draftImage, draftAudio]);
+
+  React.useEffect(() => {
+    return () => {
+      if (recordTimer.current) clearInterval(recordTimer.current);
+      recordingRef.current?.stopAndUnloadAsync().catch(() => undefined);
+    };
+  }, []);
 
   const bg = isDark ? '#1A1A1A' : '#FAFAFC';
-  const title = isDark ? '#FFFFFF' : '#191970';
   const bubble = isDark ? '#3A2A5C' : '#D5C7F7';
   const bubbleBorder = isDark ? '#6B4A8A' : '#E3B9F5';
   const bubbleText = isDark ? '#FFFFFF' : '#000000';
@@ -91,13 +122,125 @@ export function GenieChatScreen({ onBack }: Props) {
   const drawerItem = isDark ? '#AAAAAA' : '#6D6D8C';
   const userText = isDark ? '#FFFFFF' : '#000000';
 
+  const clearComposer = () => {
+    setDraft('');
+    setDraftImage(null);
+    setDraftAudio(null);
+  };
+
+  const pickImage = async () => {
+    if (sendMutation.isPending || recording) return;
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Photos', 'Allow photo access so Genie can see receipts or bills.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.55,
+      base64: true,
+    });
+    if (result.canceled || !result.assets[0]) return;
+    const asset = result.assets[0];
+    const mime = asset.mimeType ?? 'image/jpeg';
+    const dataUri = asset.base64 ? `data:${mime};base64,${asset.base64}` : await uriToDataUri(asset.uri, mime);
+    setDraftImage({ previewUri: asset.uri, dataUri, mimeType: mime });
+  };
+
+  const stopRecording = async () => {
+    if (recordTimer.current) {
+      clearInterval(recordTimer.current);
+      recordTimer.current = null;
+    }
+    const active = recordingRef.current;
+    recordingRef.current = null;
+    setRecording(false);
+    if (!active) return;
+    try {
+      const status = await active.getStatusAsync();
+      await active.stopAndUnloadAsync();
+      await Audio.setAudioModeAsync({ allowsRecordingIOS: false, playsInSilentModeIOS: true });
+      const uri = active.getURI();
+      if (!uri) return;
+      const durationMs = status.isLoaded ? status.durationMillis || recordMs : recordMs;
+      if (durationMs < 400) {
+        Alert.alert('Voice note', 'Hold a little longer so Genie can hear you.');
+        return;
+      }
+      const ext = (uri.split('.').pop() || 'm4a').toLowerCase();
+      const mime =
+        ext === 'wav'
+          ? 'audio/wav'
+          : ext === 'mp3'
+            ? 'audio/mpeg'
+            : ext === '3gp'
+              ? 'audio/3gpp'
+              : 'audio/m4a';
+      const dataUri = await uriToDataUri(uri, mime);
+      setDraftAudio({ dataUri, mimeType: mime, durationMs });
+    } catch {
+      Alert.alert('Voice note', 'Could not save that recording. Try again.');
+    }
+  };
+
+  const toggleRecording = async () => {
+    if (sendMutation.isPending) return;
+    if (recording) {
+      await stopRecording();
+      return;
+    }
+    const permission = await Audio.requestPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Microphone', 'Allow the mic so you can send Genie a voice note.');
+      return;
+    }
+    try {
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+      const { recording: next } = await Audio.Recording.createAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY
+      );
+      recordingRef.current = next;
+      setRecording(true);
+      setRecordMs(0);
+      recordTimer.current = setInterval(() => {
+        setRecordMs((ms) => {
+          if (ms >= 45000) {
+            stopRecording();
+            return ms;
+          }
+          return ms + 200;
+        });
+      }, 200);
+    } catch {
+      Alert.alert('Voice note', 'Could not start recording.');
+    }
+  };
+
   const handleSend = () => {
     const content = draft.trim();
-    if (!content || sendMutation.isPending) return;
-    setDraft('');
-    setPending(content);
+    if (sendMutation.isPending || recording) return;
+    if (!content && !draftImage && !draftAudio) return;
+    const image = draftImage;
+    const audio = draftAudio;
+    setPending({
+      content,
+      imageUri: image?.previewUri || image?.dataUri,
+      audioUri: audio?.dataUri,
+      durationMs: audio?.durationMs,
+    });
+    clearComposer();
     sendMutation.mutate(
-      { chatId, content },
+      {
+        chatId,
+        content: content || undefined,
+        image: image ? { uri: image.dataUri, mimeType: image.mimeType } : undefined,
+        audio: audio
+          ? { uri: audio.dataUri, mimeType: audio.mimeType, durationMs: audio.durationMs }
+          : undefined,
+      },
       {
         onSuccess: (result) => {
           const id = result.data?.chat?._id || result.chatId;
@@ -108,45 +251,111 @@ export function GenieChatScreen({ onBack }: Props) {
         onError: (error: any) => {
           setPending(null);
           setDraft(content);
-          Alert.alert('Genie', error?.message || 'Could not send that message. Try again.');
+          setDraftImage(image);
+          setDraftAudio(audio);
+          Alert.alert(
+            'Genie',
+            getApiErrorMessage(error, 'Could not send that message. Try again.')
+          );
         },
       }
     );
   };
 
-  const handleNewChat = () => {
-    setComposeNew(true);
-    setChatId(null);
+  const openChat = (id: string) => {
+    setComposeNew(false);
+    setChatId(id);
     setPending(null);
+    clearComposer();
     setDrawerView('chats');
     setDrawerOpen(false);
   };
 
-  const renderUser = (content: string, key: string) => (
-    <View key={key} style={[styles.userRow, { alignSelf: 'flex-end' }]}>
-      <Text
-        style={{
-          color: userText,
-          fontSize: fs(10),
-          marginRight: 14,
-          maxWidth: hs(280),
-          textAlign: 'right',
-        }}
-      >
-        {content}
-      </Text>
-      <Image
-        source={user?.profilePicture ? { uri: user.profilePicture } : AVATAR}
-        style={{ width: ms(32), height: ms(32), borderRadius: ms(16) }}
-      />
-    </View>
-  );
+  const handleNewChat = () => {
+    setDrawerView('chats');
+    setDrawerOpen(false);
+    setPending(null);
+    clearComposer();
+    if (chatId && messages.length === 0 && !pending) {
+      return;
+    }
+    setComposeNew(true);
+    setChatId(null);
+    createChat.mutate(undefined, {
+      onSuccess: (result) => {
+        const id = result.data?.chat?._id;
+        if (id) {
+          setComposeNew(false);
+          setChatId(id);
+        }
+      },
+      onError: () => {
+        setComposeNew(true);
+        setChatId(null);
+      },
+    });
+  };
+
+  const renderUser = (
+    content: string,
+    key: string,
+    extras?: {
+      attachments?: GenieAttachment[];
+      imageUri?: string;
+      audioUri?: string;
+      durationMs?: number;
+    }
+  ) => {
+    const image =
+      extras?.imageUri || extras?.attachments?.find((item) => item.type === 'image')?.uri;
+    const audio =
+      extras?.attachments?.find((item) => item.type === 'audio') ||
+      (extras?.audioUri
+        ? { type: 'audio' as const, uri: extras.audioUri, durationMs: extras.durationMs }
+        : undefined);
+    const caption =
+      content && content !== 'Photo' && content !== 'Voice note' ? content : '';
+    return (
+      <View key={key} style={[styles.msgRow, { alignSelf: 'flex-end', alignItems: 'flex-end' }]}>
+        <View style={{ marginRight: 6, maxWidth: hs(280), alignItems: 'flex-end' }}>
+          {image ? (
+            <Image
+              source={{ uri: image }}
+              style={{
+                width: hs(168),
+                height: vs(168),
+                borderRadius: 10,
+                marginBottom: caption || audio ? 6 : 0,
+              }}
+            />
+          ) : null}
+          {audio ? (
+            <VoiceNoteBubble
+              uri={audio.uri}
+              durationMs={audio.durationMs}
+              textColor={userText}
+              accent="#7C3AED"
+            />
+          ) : null}
+          {caption ? (
+            <Text style={{ color: userText, fontSize: fs(10), textAlign: 'right' }}>
+              {caption}
+            </Text>
+          ) : null}
+        </View>
+        <Image
+          source={user?.profilePicture ? { uri: user.profilePicture } : USER_AVATAR}
+          style={{ width: ms(32), height: ms(32), borderRadius: ms(16) }}
+        />
+      </View>
+    );
+  };
 
   const renderBot = (content: string, key: string) => (
-    <View key={key} style={[styles.userRow, { alignSelf: 'flex-start' }]}>
+    <View key={key} style={[styles.msgRow, { alignSelf: 'flex-start' }]}>
       <Image
-        source={AVATAR}
-        style={{ width: ms(32), height: ms(32), borderRadius: ms(16) }}
+        source={GENIE_AVATAR}
+        style={{ width: ms(32), height: ms(32), borderRadius: ms(16), marginRight: 6 }}
       />
       <View
         style={[
@@ -154,8 +363,7 @@ export function GenieChatScreen({ onBack }: Props) {
           {
             backgroundColor: bubble,
             borderColor: bubbleBorder,
-            width: hs(192),
-            marginLeft: 8,
+            maxWidth: hs(248),
           },
         ]}
       >
@@ -174,32 +382,30 @@ export function GenieChatScreen({ onBack }: Props) {
       style={[styles.root, { backgroundColor: bg }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <View style={{ paddingTop: insets.top }}>
-        <View style={{ paddingHorizontal: hs(21), paddingTop: vs(24), minHeight: vs(70) }}>
-          <BackButton onPress={onBack} />
-          <Text
-            style={{
-              position: 'absolute',
-              left: 0,
-              right: 0,
-              top: vs(46),
-              color: title,
-              fontSize: fs(16),
-              fontWeight: '600',
-              letterSpacing: -0.32,
-              textAlign: 'center',
-            }}
-          >
-            Genie AI
-          </Text>
-          <Pressable
-            onPress={() => setDrawerOpen(true)}
-            hitSlop={8}
-            style={{ marginTop: vs(11), width: 24 }}
-          >
-            <MenuIcon width={ms(19)} height={ms(12)} />
-          </Pressable>
-        </View>
+      <View
+        style={{
+          paddingTop: insets.top + vs(24),
+          paddingHorizontal: hs(21),
+          marginBottom: vs(8),
+        }}
+      >
+        <ScreenTitleBar
+          title="Genie AI"
+          onBack={onBack}
+          right={
+            <Pressable
+              onPress={() => setDrawerOpen(true)}
+              hitSlop={10}
+              style={styles.menuBtn}
+            >
+              <MenuIcon
+                width={ms(19)}
+                height={ms(12)}
+                color={isDark ? '#FFFFFF' : '#000000'}
+              />
+            </Pressable>
+          }
+        />
       </View>
 
       <ScrollView
@@ -215,7 +421,17 @@ export function GenieChatScreen({ onBack }: Props) {
         showsVerticalScrollIndicator={false}
       >
         {isBusy ? (
-          <ActivityIndicator color="#7C3AED" style={{ marginTop: 40 }} />
+          <View style={[styles.msgRow, { alignSelf: 'flex-start', marginTop: vs(12) }]}>
+            <Image
+              source={GENIE_AVATAR}
+              style={{ width: ms(32), height: ms(32), borderRadius: ms(16), marginRight: 6 }}
+            />
+            <GenieTypingBubble
+              backgroundColor={bubble}
+              borderColor={bubbleBorder}
+              dotColor={isDark ? '#E8D9FF' : '#6D6D8C'}
+            />
+          </View>
         ) : showChatEmpty ? (
           <View style={styles.emptyFill}>
             <EmptyState
@@ -228,16 +444,82 @@ export function GenieChatScreen({ onBack }: Props) {
           <>
             {messages.map((msg, index) =>
               msg.role === 'user'
-                ? renderUser(msg.content, `${msg.createdAt}-${index}`)
+                ? renderUser(msg.content, `${msg.createdAt}-${index}`, {
+                    attachments: msg.attachments,
+                  })
                 : renderBot(msg.content, `${msg.createdAt}-${index}`)
             )}
-            {pending ? renderUser(pending, 'pending-user') : null}
+            {pending
+              ? renderUser(pending.content, 'pending-user', {
+                  imageUri: pending.imageUri,
+                  audioUri: pending.audioUri,
+                  durationMs: pending.durationMs,
+                })
+              : null}
             {sendMutation.isPending ? (
-              <ActivityIndicator color="#7C3AED" style={{ alignSelf: 'flex-start', marginLeft: ms(40) }} />
+              <View style={[styles.msgRow, { alignSelf: 'flex-start' }]}>
+                <Image
+                  source={GENIE_AVATAR}
+                  style={{ width: ms(32), height: ms(32), borderRadius: ms(16), marginRight: 6 }}
+                />
+                <GenieTypingBubble
+                  backgroundColor={bubble}
+                  borderColor={bubbleBorder}
+                  dotColor={isDark ? '#E8D9FF' : '#6D6D8C'}
+                />
+              </View>
             ) : null}
           </>
         )}
       </ScrollView>
+
+      {(draftImage || draftAudio || recording) ? (
+        <View
+          style={{
+            paddingHorizontal: hs(22),
+            paddingBottom: vs(8),
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 10,
+          }}
+        >
+          {draftImage ? (
+            <View>
+              <Image
+                source={{ uri: draftImage.previewUri }}
+                style={{ width: 56, height: 56, borderRadius: 8 }}
+              />
+              <Pressable
+                onPress={() => setDraftImage(null)}
+                style={styles.removeChip}
+                hitSlop={6}
+              >
+                <Ionicons name="close" size={12} color="#FFFFFF" />
+              </Pressable>
+            </View>
+          ) : null}
+          {draftAudio ? (
+            <View
+              style={[
+                styles.audioChip,
+                { backgroundColor: isDark ? '#2A2A2A' : '#F2EBFD' },
+              ]}
+            >
+              <Text style={{ color: userText, fontSize: fs(10) }}>
+                Voice note · {formatDuration(draftAudio.durationMs)}
+              </Text>
+              <Pressable onPress={() => setDraftAudio(null)} hitSlop={6}>
+                <Ionicons name="close" size={14} color="#858585" />
+              </Pressable>
+            </View>
+          ) : null}
+          {recording ? (
+            <Text style={{ color: '#7C3AED', fontSize: fs(11) }}>
+              Recording {formatDuration(recordMs)}
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
 
       <View
         style={[
@@ -249,13 +531,15 @@ export function GenieChatScreen({ onBack }: Props) {
           },
         ]}
       >
-        <GalleryIcon width={ms(61)} height={ms(61)} />
+        <Pressable onPress={pickImage} disabled={sendMutation.isPending || recording}>
+          <GalleryIcon width={ms(61)} height={ms(61)} />
+        </Pressable>
         <View
           style={[
             styles.inputWrap,
             {
               backgroundColor: inputBg,
-              borderColor: inputBorder,
+              borderColor: recording ? '#7C3AED' : inputBorder,
               height: ms(61),
               borderRadius: ms(19),
               flex: 1,
@@ -267,8 +551,9 @@ export function GenieChatScreen({ onBack }: Props) {
           <TextInput
             value={draft}
             onChangeText={setDraft}
-            placeholder="Ask Genie anything"
+            placeholder={recording ? 'Listening…' : 'Ask Genie anything'}
             placeholderTextColor="#858585"
+            editable={!recording}
             style={{
               flex: 1,
               color: isDark ? '#FFFFFF' : '#1A1D23',
@@ -279,8 +564,17 @@ export function GenieChatScreen({ onBack }: Props) {
             onSubmitEditing={handleSend}
             returnKeyType="send"
           />
-          <MicIcon width={ms(18)} height={ms(21)} />
-          <Pressable onPress={handleSend} disabled={sendMutation.isPending}>
+          <Pressable onPress={toggleRecording} disabled={sendMutation.isPending} hitSlop={8}>
+            {recording ? (
+              <Ionicons name="mic" size={ms(20)} color="#7C3AED" />
+            ) : (
+              <MicIcon width={ms(18)} height={ms(21)} />
+            )}
+          </Pressable>
+          <Pressable
+            onPress={handleSend}
+            disabled={sendMutation.isPending || recording}
+          >
             <SendIcon width={ms(42)} height={ms(42)} />
           </Pressable>
         </View>
@@ -336,7 +630,7 @@ export function GenieChatScreen({ onBack }: Props) {
               <Text style={{ color: drawerItem, fontSize: fs(10), marginLeft: 7 }}>New Chat</Text>
             </Pressable>
             <Pressable
-              onPress={() => setDrawerView('library')}
+              onPress={() => setDrawerView((view) => (view === 'library' ? 'chats' : 'library'))}
               style={[
                 styles.drawerItem,
                 {
@@ -385,29 +679,40 @@ export function GenieChatScreen({ onBack }: Props) {
                 />
               </View>
             ) : (
-              <ScrollView contentContainerStyle={{ paddingTop: vs(18), paddingBottom: vs(24), gap: vs(22) }}>
-                {filteredChats.map((item) => (
-                  <Pressable
-                    key={item._id}
-                    onPress={() => {
-                      setComposeNew(false);
-                      setChatId(item._id);
-                      setDrawerView('chats');
-                      setDrawerOpen(false);
-                    }}
-                    style={{ paddingHorizontal: hs(22) }}
-                  >
-                    <Text
-                      style={{
-                        color: item._id === chatId ? '#7C3AED' : drawerItem,
-                        fontSize: fs(10),
-                      }}
-                      numberOfLines={1}
+              <ScrollView contentContainerStyle={{ paddingTop: vs(18), paddingBottom: vs(24), gap: vs(16) }}>
+                {filteredChats.map((item) => {
+                  const active = item._id === chatId;
+                  return (
+                    <Pressable
+                      key={item._id}
+                      onPress={() => openChat(item._id)}
+                      style={{ paddingHorizontal: hs(22) }}
                     >
-                      {item.title}
-                    </Text>
-                  </Pressable>
-                ))}
+                      <Text
+                        style={{
+                          color: active ? '#7C3AED' : drawerItem,
+                          fontSize: fs(12),
+                          fontWeight: active ? '600' : '400',
+                        }}
+                        numberOfLines={1}
+                      >
+                        {item.title || 'New Chat'}
+                      </Text>
+                      {item.preview ? (
+                        <Text
+                          style={{
+                            color: isDark ? '#777777' : '#9A9A9A',
+                            fontSize: fs(9),
+                            marginTop: 3,
+                          }}
+                          numberOfLines={1}
+                        >
+                          {item.preview}
+                        </Text>
+                      ) : null}
+                    </Pressable>
+                  );
+                })}
               </ScrollView>
             )}
           </View>
@@ -420,12 +725,37 @@ export function GenieChatScreen({ onBack }: Props) {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   emptyFill: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  userRow: { flexDirection: 'row', alignItems: 'center' },
+  menuBtn: {
+    width: 28,
+    height: 28,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+  },
+  msgRow: { flexDirection: 'row', alignItems: 'center' },
   bubble: {
     borderWidth: 1,
     borderRadius: 10,
     paddingHorizontal: 9,
     paddingVertical: 12,
+  },
+  removeChip: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#191970',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  audioChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
   },
   composer: { flexDirection: 'row', alignItems: 'center' },
   inputWrap: {

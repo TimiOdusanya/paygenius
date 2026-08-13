@@ -7,6 +7,7 @@ import { useResponsive } from '@/hooks/useResponsive';
 import { ScreenTitleBar } from '@/components/ScreenTitleBar';
 import { PasswordInput } from '@/components/FormInput';
 import { PrimaryButton } from '@/components/PrimaryButton';
+import { ConfirmModal } from '@/components/ConfirmModal';
 import { useDeleteAccountMutation } from '@/services/settings/settings.query';
 import { useAuthStore } from '@/stores';
 import { getApiErrorMessage } from '@/utils/errors';
@@ -20,37 +21,26 @@ export function DeleteAccountScreen({ navigation }: Props) {
   const { hs, vs, fs } = useResponsive();
   const mutation = useDeleteAccountMutation();
   const [password, setPassword] = useState('');
-  const [confirm, setConfirm] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const bg = isDark ? '#1A1A1A' : '#FAFAFC';
   const titleColor = isDark ? '#FFFFFF' : '#1A1D23';
   const subColor = isDark ? '#AAAAAA' : '#858585';
 
   const remove = () => {
-    Alert.alert(
-      'Delete account?',
-      'This cannot be undone. Your phone and email will be released.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => {
-            mutation.mutate(password || undefined, {
-              onSuccess: () => {
-                useAuthStore.getState().clearAuth();
-                navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
-              },
-              onError: (error) => {
-                Alert.alert(
-                  'Could not delete account',
-                  getApiErrorMessage(error, 'Confirm your password and try again.')
-                );
-              },
-            });
-          },
-        },
-      ]
-    );
+    mutation.mutate(password || undefined, {
+      onSuccess: () => {
+        setConfirmOpen(false);
+        useAuthStore.getState().clearAuth();
+        navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+      },
+      onError: (error) => {
+        setConfirmOpen(false);
+        Alert.alert(
+          'Could not delete account',
+          getApiErrorMessage(error, 'Confirm your password and try again.')
+        );
+      },
+    });
   };
 
   return (
@@ -77,17 +67,23 @@ export function DeleteAccountScreen({ navigation }: Props) {
           onChangeText={setPassword}
         />
         <PrimaryButton
-          title={confirm ? (mutation.isPending ? 'Deleting…' : 'Confirm delete') : 'Delete account'}
-          onPress={() => {
-            if (!confirm) {
-              setConfirm(true);
-              return;
-            }
-            remove();
-          }}
+          title={mutation.isPending ? 'Deleting…' : 'Delete account'}
+          onPress={() => setConfirmOpen(true)}
           style={{ backgroundColor: '#E05353' }}
         />
       </View>
+
+      <ConfirmModal
+        visible={confirmOpen}
+        title="Are you sure?"
+        message="This cannot be undone. Your phone and email will be released and you will lose access to this account."
+        confirmLabel="Yes, delete"
+        cancelLabel="No, keep it"
+        destructive
+        loading={mutation.isPending}
+        onCancel={() => setConfirmOpen(false)}
+        onConfirm={remove}
+      />
     </View>
   );
 }

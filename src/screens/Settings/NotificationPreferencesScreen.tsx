@@ -40,7 +40,7 @@ export function NotificationPreferencesScreen({ navigation }: Props) {
       >
         <ScreenTitleBar
           title="Notifications"
-          subtitle="Manage Notification Preferences."
+          subtitle="Manage Notification Preferences"
           onBack={() => navigation.goBack()}
         />
       </View>

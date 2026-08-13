@@ -3,6 +3,7 @@ export type Bank = {
   code: string;
   slug: string;
   active: boolean;
+  logo?: string;
 };
 
 export type ResolvedAccount = {

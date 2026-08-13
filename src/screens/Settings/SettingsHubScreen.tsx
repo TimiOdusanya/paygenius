@@ -1,5 +1,6 @@
 import React from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { CompositeNavigationProp } from '@react-navigation/native';
@@ -23,6 +24,10 @@ import SupportIcon from '../../../assets/images/settings/icon-support.svg';
 import RateIcon from '../../../assets/images/settings/icon-rate.svg';
 import AboutIcon from '../../../assets/images/settings/icon-about.svg';
 import DeleteIcon from '../../../assets/images/settings/icon-delete.svg';
+import { ConfirmModal } from '@/components/ConfirmModal';
+import { useDeactivateAccountMutation } from '@/services/settings/settings.query';
+import { useAuthStore } from '@/stores';
+import { getApiErrorMessage } from '@/utils/errors';
 
 type Props = BottomTabScreenProps<MainTabParamList, 'SettingsTab'> & {
   navigation: CompositeNavigationProp<
@@ -37,8 +42,28 @@ export function SettingsHubScreen({ navigation }: Props) {
   const { hs, vs, ms } = useResponsive();
   const bg = isDark ? '#1A1A1A' : '#FAFAFC';
 
+  const [deleteOpen, setDeleteOpen] = React.useState(false);
+  const [deactivateOpen, setDeactivateOpen] = React.useState(false);
+  const deactivate = useDeactivateAccountMutation();
+
   const go = (route: keyof RootStackParamList) => {
     navigation.navigate(route as never);
+  };
+
+  const confirmDeactivate = () => {
+    deactivate.mutate(undefined, {
+      onSuccess: () => {
+        setDeactivateOpen(false);
+        useAuthStore.getState().clearAuth();
+        navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+      },
+      onError: (error) => {
+        Alert.alert(
+          'Could not deactivate account',
+          getApiErrorMessage(error, 'Please try again.')
+        );
+      },
+    });
   };
 
   return (
@@ -73,7 +98,7 @@ export function SettingsHubScreen({ navigation }: Props) {
           <SettingsRow
             icon={<SecurityIcon width={ms(14)} height={ms(17)} />}
             title="Security Center"
-            subtitle="Password, PIN and security settings"
+            subtitle="Password, PIN, and security settings"
             onPress={() => go('SecurityCenter')}
           />
           <SettingsRow
@@ -86,7 +111,7 @@ export function SettingsHubScreen({ navigation }: Props) {
 
         <SettingsSection title="Payment and Banking">
           <SettingsRow
-            icon={<StatementIcon width={ms(12)} height={ms(16)} />}
+            icon={<StatementIcon width={ms(13)} height={ms(16)} />}
             title="Statement and Expense log"
             subtitle="Manage your Statement"
             onPress={() => go('StatementLog')}
@@ -100,7 +125,7 @@ export function SettingsHubScreen({ navigation }: Props) {
           <SettingsRow
             icon={<LimitsIcon width={ms(14)} height={ms(14)} />}
             title="Transaction Limits"
-            subtitle="Set Spending and Transfer limits"
+            subtitle="Set Spending and transfer limits"
             onPress={() => go('TransactionLimits')}
           />
           <SettingsRow
@@ -142,14 +167,42 @@ export function SettingsHubScreen({ navigation }: Props) {
             onPress={() => go('AboutUs')}
           />
           <SettingsRow
+            icon={<Ionicons name="pause-circle-outline" size={ms(16)} color={isDark ? '#C8C8C8' : '#858585'} />}
+            title="Deactivate account"
+            subtitle="Temporarily turn off your account"
+            onPress={() => setDeactivateOpen(true)}
+          />
+          <SettingsRow
             icon={<DeleteIcon width={ms(14)} height={ms(16)} />}
             title="Delete account"
             subtitle="Delete your account"
             destructive
-            onPress={() => go('DeleteAccount')}
+            onPress={() => setDeleteOpen(true)}
           />
         </SettingsSection>
       </ScrollView>
+
+      <ConfirmModal
+        visible={deactivateOpen}
+        title="Deactivate account?"
+        message="Your account will be turned off and you will be signed out. Contact support if you want it restored later."
+        confirmLabel="Deactivate"
+        loading={deactivate.isPending}
+        onCancel={() => setDeactivateOpen(false)}
+        onConfirm={confirmDeactivate}
+      />
+      <ConfirmModal
+        visible={deleteOpen}
+        title="Delete account?"
+        message="This permanently removes access to your wallet, statements, and saved cards. Are you sure you want to continue?"
+        confirmLabel="Continue"
+        destructive
+        onCancel={() => setDeleteOpen(false)}
+        onConfirm={() => {
+          setDeleteOpen(false);
+          go('DeleteAccount');
+        }}
+      />
     </View>
   );
 }

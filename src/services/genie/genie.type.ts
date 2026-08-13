@@ -13,10 +13,25 @@ export type GenieProfile = {
   onboardingCompleted: boolean;
 };
 
+export type GenieAttachment = {
+  type: 'image' | 'audio';
+  uri: string;
+  mimeType?: string;
+  durationMs?: number;
+};
+
 export type GenieMessage = {
   role: 'user' | 'assistant';
   content: string;
+  transcript?: string;
+  attachments?: GenieAttachment[];
   createdAt: string;
+};
+
+export type GenieMessagePayload = {
+  content?: string;
+  image?: { uri: string; mimeType?: string };
+  audio?: { uri: string; mimeType?: string; durationMs?: number };
 };
 
 export type GenieChat = {

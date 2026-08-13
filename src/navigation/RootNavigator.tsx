@@ -60,6 +60,7 @@ import {
 import type { SaveGoalDraft } from "@/services/savings/savings.type";
 import type { LinkLoanPayload } from "@/services/loans/loans.type";
 import type { BillPayDraft, BillPayment } from "@/services/bills/bills.type";
+import type { TransferDraft, TransferRecord } from "@/services/transfer/transfer.type";
 import {
   PayBillsHubScreen,
   AirtimeScreen,
@@ -69,6 +70,14 @@ import {
   BillPinScreen,
   BillReceiptScreen,
 } from "@/screens/Bills";
+import {
+  TransferHubScreen,
+  TransferDetailsScreen,
+  TransferReviewScreen,
+  TransferPinScreen,
+  TransferSuccessScreen,
+  TransferReceiptScreen,
+} from "@/screens/Transfer";
 import { MainTabNavigator } from "./MainTabNavigator";
 import { useTheme } from "@/context/ThemeContext";
 import {
@@ -167,6 +176,25 @@ export type RootStackParamList = {
   BillTelevision: undefined;
   BillPin: BillPayDraft;
   BillReceipt: { payment: BillPayment };
+  // Transfers
+  TransferHub: {
+    source?: 'WALLET' | 'BUDGET';
+    budgetId?: string;
+    budgetName?: string;
+  } | undefined;
+  TransferDetails: {
+    rail: 'PAYGENIUS' | 'BANK';
+    bankCode?: string;
+    bankName?: string;
+    bankLogo?: string;
+    paymentSource?: 'WALLET' | 'BUDGET';
+    budgetId?: string;
+    budgetName?: string;
+  };
+  TransferReview: TransferDraft;
+  TransferPin: TransferDraft;
+  TransferSuccess: { transfer: TransferRecord };
+  TransferReceipt: { transfer: TransferRecord };
   // Settings + notifications
   NotificationInbox: undefined;
   NotificationPreferences: undefined;
@@ -298,6 +326,22 @@ export function RootNavigator() {
       <Stack.Screen
         name="BillReceipt"
         component={BillReceiptScreen}
+        options={{ animation: "fade", gestureEnabled: false }}
+      />
+
+      {/* Transfers */}
+      <Stack.Screen name="TransferHub" component={TransferHubScreen} />
+      <Stack.Screen name="TransferDetails" component={TransferDetailsScreen} />
+      <Stack.Screen name="TransferReview" component={TransferReviewScreen} />
+      <Stack.Screen name="TransferPin" component={TransferPinScreen} />
+      <Stack.Screen
+        name="TransferSuccess"
+        component={TransferSuccessScreen}
+        options={{ animation: "fade", gestureEnabled: false }}
+      />
+      <Stack.Screen
+        name="TransferReceipt"
+        component={TransferReceiptScreen}
         options={{ animation: "fade", gestureEnabled: false }}
       />
 

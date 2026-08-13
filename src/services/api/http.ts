@@ -28,9 +28,22 @@ export const createApiClient = (baseURL: string): AxiosInstance => {
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
+      const body = config.data
+        ? (() => {
+            try {
+              const raw =
+                typeof config.data === 'string'
+                  ? config.data
+                  : JSON.stringify(config.data);
+              return raw.length > 400 ? `${raw.slice(0, 400)}… [${raw.length} chars]` : raw;
+            } catch {
+              return '[body]';
+            }
+          })()
+        : '';
       console.log(
         `[API →] ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`,
-        config.data ? JSON.stringify(config.data) : ''
+        body
       );
       return config;
     },
