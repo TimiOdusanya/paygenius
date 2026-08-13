@@ -3,17 +3,16 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/RootNavigator';
+import { DateOfBirthField } from '@/components/DateOfBirthField';
 import { FormInput } from '@/components/FormInput';
 import { Header } from '@/components/Header';
 import { PrimaryButton } from '@/components/PrimaryButton';
@@ -38,23 +37,17 @@ export function ProfileSetupScreen({ navigation }: Props) {
   useTrackOnboardingRoute('ProfileSetup');
   const insets = useSafeAreaInsets();
   const { isDark } = useTheme();
-  const { hs, vs, fs, ms } = useResponsive();
+  const { hs, vs, fs } = useResponsive();
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [username, setUsername] = useState('');
   const [debouncedUsername, setDebouncedUsername] = useState('');
   const [dob, setDob] = useState<Date | null>(null);
-  const [showDatePicker, setShowDatePicker] = useState(false);
 
   const bg = isDark ? '#1A1A1A' : '#FAFAFC';
   const avatarBg = isDark ? '#2E1A5E' : '#AFE9D6';
   const avatarBorder = isDark ? '#8855DD' : '#D8C4FA';
-  const inputBorder = isDark ? '#3B3B3B' : '#191970';
-  const inputBg = isDark ? '#2A2A2A' : '#FAFAFC';
-  const inputText = isDark ? '#FFFFFF' : '#000000';
-  const placeholderColor = isDark ? 'rgba(133,133,133,0.6)' : 'rgba(133,133,133,0.6)';
-  const dobBoxBg = inputBg;
   const availableColor = isDark ? '#6EE7B7' : '#059669';
   const takenColor = isDark ? '#FCA5A5' : '#DC2626';
   const checkingColor = isDark ? '#CCCCCC' : '#858585';
@@ -125,13 +118,6 @@ export function ProfileSetupScreen({ navigation }: Props) {
 
   const isReady =
     Boolean(firstName.trim() && lastName.trim() && dob) && usernameAvailable;
-
-  const formatDobPart = (type: 'day' | 'month' | 'year') => {
-    if (!dob) return '';
-    if (type === 'day') return String(dob.getDate()).padStart(2, '0');
-    if (type === 'month') return dob.toLocaleString('en', { month: 'short' });
-    return String(dob.getFullYear());
-  };
 
   return (
     <KeyboardAvoidingView
@@ -207,57 +193,10 @@ export function ProfileSetupScreen({ navigation }: Props) {
               </Text>
             ) : null}
 
-            {/* Date of Birth */}
             <View style={{ marginTop: vs(12) }}>
-              <Text style={[styles.fieldLabel, { color: isDark ? '#FFFFFF' : '#000000', fontSize: fs(11) }]}>
-                Date of Birth
-              </Text>
-              <Pressable onPress={() => setShowDatePicker(true)}>
-                <View style={[styles.dobRow, { marginTop: vs(8) }]}>
-                  {(['day', 'month', 'year'] as const).map((part) => (
-                    <View
-                      key={part}
-                      style={[
-                        styles.dobBox,
-                        {
-                          backgroundColor: dobBoxBg,
-                          borderColor: inputBorder,
-                          borderRadius: ms(12),
-                          height: vs(44),
-                          flex: 1,
-                        },
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.dobText,
-                          {
-                            color: dob ? inputText : placeholderColor,
-                            fontSize: fs(11),
-                          },
-                        ]}
-                      >
-                        {dob ? formatDobPart(part) : (part === 'day' ? 'DD' : part === 'month' ? 'Month' : 'YYYY')}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              </Pressable>
+              <DateOfBirthField value={dob} onChange={setDob} />
             </View>
           </View>
-
-          {showDatePicker && (
-            <DateTimePicker
-              value={dob ?? new Date(2000, 0, 1)}
-              mode="date"
-              display="spinner"
-              maximumDate={new Date()}
-              onChange={(event, date) => {
-                setShowDatePicker(false);
-                if (date) setDob(date);
-              }}
-            />
-          )}
 
           <View style={styles.footer}>
             <PrimaryButton
@@ -300,10 +239,6 @@ const styles = StyleSheet.create({
   innerRing: { borderWidth: 1, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
   avatar: { borderWidth: 4, alignItems: 'center', justifyContent: 'center' },
   form: {},
-  fieldLabel: { fontWeight: '400', letterSpacing: 0.25 },
-  dobRow: { flexDirection: 'row', gap: 12 },
-  dobBox: { borderWidth: 0.4, alignItems: 'center', justifyContent: 'center' },
-  dobText: { fontWeight: '400', textAlign: 'center' },
   footer: { marginTop: 'auto', paddingTop: 24, paddingBottom: 8 },
   btnDisabled: { opacity: 0.6 },
 });

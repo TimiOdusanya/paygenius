@@ -1,16 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
-import {
-  Alert,
-  Animated,
-  Easing,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import Svg, { Circle } from 'react-native-svg';
+import { useIsFocused } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/RootNavigator';
 import { Header, PrimaryButton } from '@/components';
@@ -19,6 +12,7 @@ import { useResponsive } from '@/hooks/useResponsive';
 import { useTrackOnboardingRoute } from '@/hooks/useTrackOnboardingRoute';
 import { useUploadSelfieMutation } from '@/services/profile/profile.query';
 import { getApiErrorMessage } from '@/utils/errors';
+import { StepProgressLoader } from './StepProgressLoader';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TakeSelfie'>;
 
@@ -31,80 +25,10 @@ const STEPS = [
 
 const TOTAL_STEPS = STEPS.length;
 
-function StepProgressLoader({
-  progress,
-  size,
-  spinning,
-}: {
-  progress: number;
-  size: number;
-  spinning: boolean;
-}) {
-  const spinAnim = useRef(new Animated.Value(0)).current;
-  const stroke = 5;
-  const radius = (size - stroke) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const clamped = Math.min(1, Math.max(0.08, progress));
-
-  useEffect(() => {
-    if (!spinning) {
-      spinAnim.setValue(0);
-      return;
-    }
-    const loop = Animated.loop(
-      Animated.timing(spinAnim, {
-        toValue: 1,
-        duration: 1400,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      })
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [spinning, spinAnim]);
-
-  const rotate = spinAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
-  });
-
-  return (
-    <Animated.View
-      style={{
-        width: size,
-        height: size,
-        transform: spinning ? [{ rotate }] : undefined,
-      }}
-    >
-      <Svg width={size} height={size}>
-        <Circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          stroke="#E5D8FB"
-          strokeWidth={stroke}
-          fill="none"
-        />
-        <Circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          stroke="#10B981"
-          strokeWidth={stroke}
-          fill="none"
-          strokeDasharray={[circumference * clamped, circumference]}
-          strokeLinecap="round"
-          rotation="-90"
-          origin={`${size / 2}, ${size / 2}`}
-        />
-      </Svg>
-    </Animated.View>
-  );
-}
-
 export function TakeSelfieScreen({ navigation }: Props) {
   useTrackOnboardingRoute('TakeSelfie');
   const insets = useSafeAreaInsets();
+  const isFocused = useIsFocused();
   const { isDark } = useTheme();
   const { hs, vs, fs, ms } = useResponsive();
 
@@ -116,6 +40,14 @@ export function TakeSelfieScreen({ navigation }: Props) {
   const cameraRef = useRef<CameraView>(null);
 
   const uploadSelfieMutation = useUploadSelfieMutation();
+
+  useEffect(() => {
+    if (!permission?.granted) {
+      requestPermission();
+    }
+  }, [permission?.granted, requestPermission]);
+
+  const showCamera = Boolean(permission?.granted && isFocused && !isUploading);
 
   const bg = isDark ? '#1A1A1A' : '#FAFAFC';
   const subtitleColor = isDark ? '#CCCCCC' : '#858585';
@@ -221,7 +153,6 @@ export function TakeSelfieScreen({ navigation }: Props) {
         />
       </View>
 
-      {/* Step badge + instruction */}
       <View
         style={[
           styles.stepRow,
@@ -253,7 +184,6 @@ export function TakeSelfieScreen({ navigation }: Props) {
         </Text>
       </View>
 
-      {/* Camera frame */}
       <View
         style={[
           styles.cameraContainer,
@@ -267,25 +197,19 @@ export function TakeSelfieScreen({ navigation }: Props) {
           },
         ]}
       >
-        {permission?.granted ? (
-          <CameraView ref={cameraRef} style={{ flex: 1 }} facing="front">
-            <View style={styles.cameraOverlay}>
-              <View
-                style={[
-                  styles.faceOval,
-                  {
-                    width: ms(200),
-                    height: ms(200),
-                    borderRadius: ms(100),
-                    borderColor:
-                      stepIndex === TOTAL_STEPS - 1 && !busy
-                        ? 'rgba(16,185,129,0.8)'
-                        : 'rgba(255,255,255,0.45)',
-                  },
-                ]}
-              />
-            </View>
-          </CameraView>
+        {showCamera ? (
+          <CameraView
+            ref={cameraRef}
+            style={StyleSheet.absoluteFill}
+            facing="front"
+            mute
+            onMountError={() => {
+              Alert.alert(
+                'Camera Error',
+                'Could not start the camera. Please go back and try again.'
+              );
+            }}
+          />
         ) : (
           <View style={styles.cameraInner}>
             <View
@@ -306,20 +230,39 @@ export function TakeSelfieScreen({ navigation }: Props) {
                 color="rgba(255,255,255,0.35)"
               />
             </View>
-            <Text
-              style={{
-                color: 'rgba(255,255,255,0.6)',
-                fontSize: fs(12),
-                marginTop: vs(12),
-              }}
-            >
-              Tap Continue to grant camera access
-            </Text>
+            {!permission?.granted ? (
+              <Text
+                style={{
+                  color: 'rgba(255,255,255,0.6)',
+                  fontSize: fs(12),
+                  marginTop: vs(12),
+                }}
+              >
+                Camera access is required to take a selfie
+              </Text>
+            ) : null}
           </View>
         )}
+        {showCamera ? (
+          <View style={styles.cameraOverlay} pointerEvents="none">
+            <View
+              style={[
+                styles.faceOval,
+                {
+                  width: ms(200),
+                  height: ms(200),
+                  borderRadius: ms(100),
+                  borderColor:
+                    stepIndex === TOTAL_STEPS - 1 && !busy
+                      ? 'rgba(16,185,129,0.8)'
+                      : 'rgba(255,255,255,0.45)',
+                },
+              ]}
+            />
+          </View>
+        ) : null}
       </View>
 
-      {/* Tip text + loader beside (Figma progress ring) */}
       <View
         style={[
           styles.tipRow,
@@ -383,7 +326,11 @@ const styles = StyleSheet.create({
   stepText: { fontWeight: '400' },
   cameraContainer: {},
   cameraInner: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  cameraOverlay: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  cameraOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   faceOval: {
     borderWidth: 2,
     alignItems: 'center',

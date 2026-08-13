@@ -31,4 +31,8 @@ export const PROFILE_ENDPOINTS = {
     ROUTE: '/api/profile/enable-biometric',
     MUTATION_KEY: ['profile', 'enable-biometric'],
   },
+  UPDATE: {
+    ROUTE: '/api/profile/',
+    MUTATION_KEY: ['profile', 'update'],
+  },
 } as const;

@@ -9,6 +9,7 @@ import type {
   UploadSelfiePayload,
   SetupPinPayload,
   CheckUsernameResponse,
+  UpdateProfilePayload,
 } from './profile.type';
 
 function syncUserFromResponse(res: ApiResponse<ProfileResponse>) {
@@ -80,6 +81,16 @@ export const setupPinAPI = async (
 ): Promise<ApiResponse<ProfileResponse>> => {
   const response = await paygeniusAPI.post<ApiResponse<ProfileResponse>>(
     PROFILE_ENDPOINTS.SETUP_PIN.ROUTE,
+    data
+  );
+  return syncUserFromResponse(response.data);
+};
+
+export const updateProfileAPI = async (
+  data: UpdateProfilePayload
+): Promise<ApiResponse<ProfileResponse>> => {
+  const response = await paygeniusAPI.patch<ApiResponse<ProfileResponse>>(
+    PROFILE_ENDPOINTS.UPDATE.ROUTE,
     data
   );
   return syncUserFromResponse(response.data);

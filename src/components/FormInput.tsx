@@ -1,7 +1,9 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
+  Keyboard,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -9,12 +11,14 @@ import {
   TextInputProps,
   View,
   ViewStyle,
+  useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import SelectChevron from '../../assets/images/kyc/select-chevron.svg';
 import { useTheme } from '@/context/ThemeContext';
 import { useResponsive } from '@/hooks/useResponsive';
+import { EmptyState } from '@/components/EmptyState';
 
 function useFormFieldTheme() {
   const { isDark } = useTheme();
@@ -33,10 +37,12 @@ function useFormFieldTheme() {
 }
 
 type FormFieldShellProps = {
-  label: string;
+  label?: string;
   containerStyle?: ViewStyle;
   children: React.ReactNode;
   disabled?: boolean;
+  multiline?: boolean;
+  fieldHeight?: number;
 };
 
 /** Shared label + bordered field chrome used by text and select inputs. */
@@ -45,32 +51,38 @@ function FormFieldShell({
   containerStyle,
   children,
   disabled = false,
+  multiline = false,
+  fieldHeight,
 }: FormFieldShellProps) {
   const { fs, vs } = useResponsive();
   const { borderColor, inputBg, labelColor } = useFormFieldTheme();
+  const height = fieldHeight ?? (multiline ? vs(104) : vs(44));
 
   return (
     <View style={[styles.container, containerStyle, disabled && styles.disabled]}>
-      <Text
-        style={[
-          styles.label,
-          {
-            color: labelColor,
-            fontSize: fs(11),
-            letterSpacing: 0.25,
-          },
-        ]}
-      >
-        {label}
-      </Text>
+      {label ? (
+        <Text
+          style={[
+            styles.label,
+            {
+              color: labelColor,
+              fontSize: fs(11),
+              letterSpacing: 0.25,
+            },
+          ]}
+        >
+          {label}
+        </Text>
+      ) : null}
       <View
         style={[
           styles.inputWrapper,
           {
             backgroundColor: inputBg,
             borderColor,
-            height: vs(44),
-            marginTop: vs(5),
+            height,
+            marginTop: label ? vs(5) : 0,
+            alignItems: multiline ? 'flex-start' : 'center',
           },
         ]}
       >
@@ -81,9 +93,10 @@ function FormFieldShell({
 }
 
 type FormInputProps = TextInputProps & {
-  label: string;
+  label?: string;
   containerStyle?: ViewStyle;
   rightIcon?: React.ReactNode;
+  fieldHeight?: number;
 };
 
 export function FormInput({
@@ -92,9 +105,11 @@ export function FormInput({
   rightIcon,
   style,
   editable,
+  multiline,
+  fieldHeight,
   ...props
 }: FormInputProps) {
-  const { fs, hs } = useResponsive();
+  const { fs, hs, vs } = useResponsive();
   const { textColor, placeholderColor } = useFormFieldTheme();
 
   return (
@@ -102,6 +117,8 @@ export function FormInput({
       label={label}
       containerStyle={containerStyle}
       disabled={editable === false}
+      multiline={!!multiline}
+      fieldHeight={fieldHeight}
     >
       <TextInput
         style={[
@@ -111,11 +128,14 @@ export function FormInput({
             fontSize: fs(12),
             paddingHorizontal: hs(16),
             flex: 1,
+            paddingTop: multiline ? vs(16) : 0,
+            textAlignVertical: multiline ? 'top' : 'center',
           },
           style,
         ]}
         placeholderTextColor={placeholderColor}
         editable={editable}
+        multiline={multiline}
         {...props}
       />
       {rightIcon ? (
@@ -182,10 +202,37 @@ export function SelectInput({
   placeholderFontSize,
 }: SelectInputProps) {
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
   const { fs, vs, hs, ms } = useResponsive();
   const theme = useFormFieldTheme();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  useEffect(() => {
+    if (!open) {
+      setKeyboardHeight(0);
+      return;
+    }
+    const show = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => setKeyboardHeight(e.endCoordinates.height)
+    );
+    const hide = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setKeyboardHeight(0)
+    );
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, [open]);
+
+  const sheetMaxHeight = Math.min(
+    windowHeight * 0.75,
+    windowHeight - keyboardHeight - vs(16)
+  );
+  const listMaxHeight = Math.max(vs(160), sheetMaxHeight - vs(168));
 
   const filtered = useMemo(() => {
     const safe = options ?? [];
@@ -235,17 +282,18 @@ export function SelectInput({
         animationType="slide"
         onRequestClose={() => setOpen(false)}
       >
-        <Pressable style={styles.backdrop} onPress={() => setOpen(false)}>
-          <Pressable
+        <View style={[styles.backdrop, { paddingBottom: keyboardHeight }]}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setOpen(false)} />
+          <View
             style={[
               styles.sheet,
               {
                 backgroundColor: theme.sheetBg,
-                paddingBottom: Math.max(insets.bottom, vs(16)),
-                maxHeight: '70%',
+                paddingBottom:
+                  keyboardHeight > 0 ? vs(12) : Math.max(insets.bottom, vs(16)),
+                maxHeight: sheetMaxHeight,
               },
             ]}
-            onPress={(e) => e.stopPropagation()}
           >
             <View style={styles.handleWrap}>
               <View
@@ -292,7 +340,8 @@ export function SelectInput({
               data={filtered}
               keyExtractor={(item) => item}
               keyboardShouldPersistTaps="handled"
-              style={{ marginTop: vs(8), flexGrow: 0 }}
+              keyboardDismissMode="on-drag"
+              style={{ marginTop: vs(8), maxHeight: listMaxHeight }}
               renderItem={({ item }) => {
                 const selected = item === value;
                 return (
@@ -322,20 +371,16 @@ export function SelectInput({
                 );
               }}
               ListEmptyComponent={
-                <Text
-                  style={{
-                    textAlign: 'center',
-                    color: theme.placeholderColor,
-                    fontSize: fs(12),
-                    marginTop: vs(24),
-                  }}
-                >
-                  No results
-                </Text>
+                <EmptyState
+                  variant="history"
+                  compact
+                  title="No results"
+                  subtitle="Nothing matches that search."
+                />
               }
             />
-          </Pressable>
-        </Pressable>
+          </View>
+        </View>
       </Modal>
     </>
   );
@@ -387,6 +432,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     overflow: 'hidden',
+    zIndex: 1,
   },
   handleWrap: { alignItems: 'center', paddingTop: 10 },
   handle: { width: 36, height: 4, borderRadius: 2 },

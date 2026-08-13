@@ -3,6 +3,8 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { AppRoute, MarketingStep } from '@/navigation/onboardingResume';
 
+export type ThemeMode = 'light' | 'dark' | 'system';
+
 export type AppRegion = 'USA' | 'NGN';
 
 export type OnboardingRouteParams = {
@@ -20,6 +22,9 @@ type PreferencesState = {
   lastOnboardingRoute: AppRoute | null;
   lastOnboardingParams: OnboardingRouteParams | null;
   biometricSkipped: boolean;
+  /** Last phone used to register or sign in on this device */
+  lastPhoneNumber: string | null;
+  themeMode: ThemeMode;
   hasHydrated: boolean;
   setRegion: (region: AppRegion) => void;
   setMarketingStep: (step: MarketingStep) => void;
@@ -35,6 +40,8 @@ type PreferencesState = {
   ) => void;
   clearLastOnboardingRoute: () => void;
   setBiometricSkipped: (skipped: boolean) => void;
+  setLastPhoneNumber: (phone: string | null) => void;
+  setThemeMode: (mode: ThemeMode) => void;
   markOnboardingFinished: () => void;
   currency: () => 'USD' | 'NGN' | null;
   setHasHydrated: (value: boolean) => void;
@@ -51,6 +58,8 @@ export const usePreferencesStore = create<PreferencesState>()(
       lastOnboardingRoute: null,
       lastOnboardingParams: null,
       biometricSkipped: false,
+      lastPhoneNumber: null,
+      themeMode: 'light',
       hasHydrated: false,
 
       setRegion: (region) => set({ region }),
@@ -79,6 +88,11 @@ export const usePreferencesStore = create<PreferencesState>()(
         set({ lastOnboardingRoute: null, lastOnboardingParams: null }),
 
       setBiometricSkipped: (biometricSkipped) => set({ biometricSkipped }),
+
+      setLastPhoneNumber: (lastPhoneNumber) =>
+        set({ lastPhoneNumber: lastPhoneNumber || null }),
+
+      setThemeMode: (themeMode) => set({ themeMode }),
 
       markOnboardingFinished: () =>
         set({
@@ -110,6 +124,8 @@ export const usePreferencesStore = create<PreferencesState>()(
         lastOnboardingRoute: state.lastOnboardingRoute,
         lastOnboardingParams: state.lastOnboardingParams,
         biometricSkipped: state.biometricSkipped,
+        lastPhoneNumber: state.lastPhoneNumber,
+        themeMode: state.themeMode,
       }),
       onRehydrateStorage: () => () => {
         usePreferencesStore.setState({ hasHydrated: true });

@@ -13,7 +13,16 @@ import type {
   GoogleCodePayload,
   AppleAuthPayload,
 } from './auth.type';
+import type { User } from '@/types';
 import { useAuthStore } from '@/stores/auth.store';
+import { usePreferencesStore } from '@/stores/preferences.store';
+
+function persistAuth(token: string, user: User) {
+  useAuthStore.getState().setAuth(token, user);
+  if (user.phoneNumber) {
+    usePreferencesStore.getState().setLastPhoneNumber(user.phoneNumber);
+  }
+}
 
 export const sendVerificationAPI = async (
   data: SendVerificationPayload
@@ -38,7 +47,7 @@ export const registerAPI = async (
   );
   const res = response.data;
   if (res.success && res.data) {
-    useAuthStore.getState().setAuth(res.data.token, res.data.user);
+    persistAuth(res.data.token, res.data.user);
   }
   return res;
 };
@@ -51,7 +60,7 @@ export const loginAPI = async (data: LoginPayload): Promise<ApiResponse<AuthData
   );
   const res = response.data;
   if (res.success && res.data) {
-    useAuthStore.getState().setAuth(res.data.token, res.data.user);
+    persistAuth(res.data.token, res.data.user);
   }
   return res;
 };
@@ -65,7 +74,7 @@ export const loginBiometricAPI = async (
   );
   const res = response.data;
   if (res.success && res.data) {
-    useAuthStore.getState().setAuth(res.data.token, res.data.user);
+    persistAuth(res.data.token, res.data.user);
   }
   return res;
 };
@@ -79,7 +88,7 @@ export const googleAuthAPI = async (
   );
   const res = response.data;
   if (res.success && res.data) {
-    useAuthStore.getState().setAuth(res.data.token, res.data.user);
+    persistAuth(res.data.token, res.data.user);
   }
   return res;
 };
@@ -93,7 +102,7 @@ export const googleCodeAPI = async (
   );
   const res = response.data;
   if (res.success && res.data) {
-    useAuthStore.getState().setAuth(res.data.token, res.data.user);
+    persistAuth(res.data.token, res.data.user);
   }
   return res;
 };
@@ -107,18 +116,28 @@ export const appleAuthAPI = async (
   );
   const res = response.data;
   if (res.success && res.data) {
-    useAuthStore.getState().setAuth(res.data.token, res.data.user);
+    persistAuth(res.data.token, res.data.user);
   }
   return res;
 };
 
 export const getMeAPI = async (): Promise<ApiResponse<MeResponse>> => {
-  const response = await paygeniusAPI.get<ApiResponse<MeResponse>>(
+  const response = await paygeniusAPI.get<ApiResponse<MeResponse | User>>(
     AUTH_ENDPOINTS.ME.ROUTE
   );
   const res = response.data;
   if (res.success && res.data) {
-    useAuthStore.getState().setUser(res.data.user);
+    const payload = res.data as MeResponse | User;
+    const user =
+      payload && typeof payload === 'object' && 'user' in payload && payload.user
+        ? payload.user
+        : (payload as User);
+    if (user?._id) {
+      useAuthStore.getState().setUser(user);
+      if (user.phoneNumber) {
+        usePreferencesStore.getState().setLastPhoneNumber(user.phoneNumber);
+      }
+    }
   }
-  return res;
+  return res as ApiResponse<MeResponse>;
 };

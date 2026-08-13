@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { User } from '@/types';
+import { usePreferencesStore } from './preferences.store';
 
 type AuthState = {
   token: string | null;
@@ -25,7 +26,13 @@ export const useAuthStore = create<AuthState>()(
 
       setUser: (user) => set({ user }),
 
-      clearAuth: () => set({ token: null, user: null }),
+      clearAuth: () => {
+        const phone = get().user?.phoneNumber;
+        if (phone) {
+          usePreferencesStore.getState().setLastPhoneNumber(phone);
+        }
+        set({ token: null, user: null });
+      },
 
       isAuthenticated: () => !!get().token,
 

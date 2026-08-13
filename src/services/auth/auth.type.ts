@@ -15,7 +15,11 @@ export type LoginPayload = { identifier: string; password: string };
 export type LoginBiometricPayload = { phoneNumber: string };
 export type GoogleAuthPayload = { idToken: string };
 export type GoogleCodePayload = { code: string; redirectUri?: string };
-export type AppleAuthPayload = { identityToken: string; fullName?: string };
+export type AppleAuthPayload = {
+  identityToken: string;
+  fullName?: string;
+  user?: { email?: string; name?: string };
+};
 
 export interface MeResponse {
   user: User;

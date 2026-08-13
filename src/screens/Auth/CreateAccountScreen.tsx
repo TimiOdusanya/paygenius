@@ -8,7 +8,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,19 +15,20 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/RootNavigator';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { Header } from '@/components/Header';
+import { PhoneNumberField } from '@/components/PhoneNumberField';
 import { useTheme } from '@/context/ThemeContext';
 import { useResponsive } from '@/hooks/useResponsive';
 import { useTrackOnboardingRoute } from '@/hooks/useTrackOnboardingRoute';
-import { useGoogleAuth } from '@/hooks/useGoogleAuth';
+import { useGoogleSignIn } from '@/hooks/useGoogleAuth';
 import { signInWithApple, isAppleSignInAvailable } from '@/hooks/useAppleAuth';
 import {
   useSendVerificationMutation,
-  useGoogleCodeMutation,
   useAppleAuthMutation,
 } from '@/services/auth/auth.query';
 import { navigateAfterAuth } from '@/navigation/navigateAfterAuth';
-import { usePreferencesStore } from '@/stores/preferences.store';
+import { usePreferencesStore } from '@/stores';
 import { getApiErrorMessage } from '@/utils/errors';
+import { isValidLocalPhone, toE164 } from '@/utils/phone';
 import GoogleLogo from '../../../assets/images/auth/google-logo.svg';
 import AppleLogo from '../../../assets/images/auth/apple-logo.svg';
 
@@ -42,31 +42,28 @@ export function CreateAccountScreen({ navigation }: Props) {
 
   const [phoneNumber, setPhoneNumber] = useState('');
   const [appleAvailable, setAppleAvailable] = useState(false);
+  const region = usePreferencesStore((s) => s.region);
 
   const bg = isDark ? '#1A1A1A' : '#FAFAFC';
   const titleColor = isDark ? '#FFFFFF' : '#191970';
-  const inputBg = isDark ? '#1E1E2E' : '#FAFAFC';
-  const inputBorderColor = isDark ? '#3B3B3B' : '#191970';
-  const labelColor = isDark ? '#CCCCCC' : '#1A1D23';
-  const flagBg = isDark ? '#2A2A5A' : '#C0C0F1';
   const btnBorder = isDark ? '#3B3B3B' : '#191970';
   const socialTextColor = isDark ? '#FFFFFF' : '#1A1D23';
   const linkSecondary = isDark ? '#AAAAAA' : '#6D6D8C';
   const linkAccent = isDark ? '#8888FF' : '#191970';
 
   const sendVerification = useSendVerificationMutation();
-  const googleCodeMutation = useGoogleCodeMutation();
+  const googleSignIn = useGoogleSignIn();
   const appleAuthMutation = useAppleAuthMutation();
 
   useEffect(() => {
     isAppleSignInAvailable().then(setAppleAvailable);
   }, []);
 
-  const cleanPhone = phoneNumber.replace(/\D/g, '');
-  const fullPhoneNumber = cleanPhone ? `+234${cleanPhone}` : '';
+  const fullPhoneNumber = toE164(phoneNumber, region);
+  const phoneReady = isValidLocalPhone(phoneNumber, region);
 
   const handleContinue = () => {
-    if (cleanPhone.length < 7) {
+    if (!phoneReady) {
       Alert.alert('Invalid phone number', 'Please enter a valid phone number.');
       return;
     }
@@ -89,35 +86,11 @@ export function CreateAccountScreen({ navigation }: Props) {
     );
   };
 
-  const { request: googleRequest, promptAsync: promptGoogle } = useGoogleAuth(
-    async (result) => {
-      if (!result.success) {
-        if (result.error !== 'cancelled') {
-          Alert.alert('Google Sign-In Failed', result.error);
-        }
-        return;
-      }
-      googleCodeMutation.mutate(
-        { code: result.code, redirectUri: result.redirectUri },
-        {
-          onSuccess: () => navigateAfterAuth(navigation),
-          onError: (err) => {
-            Alert.alert(
-              'Error',
-              getApiErrorMessage(err, 'Google authentication failed. Please try again.')
-            );
-          },
-        }
-      );
-    }
-  );
-
   const handleGoogleSignIn = () => {
-    if (!process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID) {
-      Alert.alert('Configuration Error', 'Google Sign-In is not configured yet.');
-      return;
-    }
-    promptGoogle();
+    googleSignIn.signIn({
+      onSuccess: () => navigateAfterAuth(navigation),
+      onError: (message) => Alert.alert('Google Sign-In Failed', message),
+    });
   };
 
   const handleAppleSignIn = async () => {
@@ -129,7 +102,14 @@ export function CreateAccountScreen({ navigation }: Props) {
       return;
     }
     appleAuthMutation.mutate(
-      { identityToken: result.identityToken, fullName: result.fullName },
+      {
+        identityToken: result.identityToken,
+        fullName: result.fullName,
+        user: {
+          email: result.email,
+          name: result.fullName,
+        },
+      },
       {
         onSuccess: () => navigateAfterAuth(navigation),
         onError: (err) => {
@@ -144,7 +124,7 @@ export function CreateAccountScreen({ navigation }: Props) {
 
   const isLoading =
     sendVerification.isPending ||
-    googleCodeMutation.isPending ||
+    googleSignIn.isPending ||
     appleAuthMutation.isPending;
 
   return (
@@ -168,75 +148,23 @@ export function CreateAccountScreen({ navigation }: Props) {
           />
         </View>
 
-        {/* Phone number field */}
         <View style={[styles.fieldGroup, { marginTop: vs(30), paddingHorizontal: hs(21) }]}>
-          <Text style={[styles.fieldLabel, { color: labelColor, fontSize: fs(10) }]}>
-            Phone number
-          </Text>
-          <View style={[styles.phoneRow, { marginTop: vs(8), gap: hs(6) }]}>
-            {/* Country flag + code */}
-            <View
-              style={[
-                styles.flagBtn,
-                {
-                  backgroundColor: flagBg,
-                  borderColor: inputBorderColor,
-                  borderWidth: 0.4,
-                  borderRadius: ms(12),
-                  height: vs(44),
-                  paddingHorizontal: hs(12),
-                  minWidth: ms(73),
-                },
-              ]}
-            >
-              <Text style={{ fontSize: ms(14) }}>🇳🇬</Text>
-              <Text style={[styles.flagText, { color: '#FFFFFF', fontSize: fs(11), letterSpacing: 0.25 }]}>
-                NGN
-              </Text>
-            </View>
+          <PhoneNumberField value={phoneNumber} onChangeText={setPhoneNumber} />
 
-            {/* Phone input */}
-            <TextInput
-              style={[
-                styles.phoneInput,
-                {
-                  flex: 1,
-                  borderColor: inputBorderColor,
-                  backgroundColor: inputBg,
-                  color: isDark ? '#FFFFFF' : '#1A1D23',
-                  fontSize: fs(11),
-                  height: vs(44),
-                  borderRadius: ms(12),
-                  paddingHorizontal: hs(14),
-                  borderWidth: 0.4,
-                },
-              ]}
-              value={phoneNumber}
-              onChangeText={setPhoneNumber}
-              placeholder="9151864174"
-              placeholderTextColor={isDark ? '#666' : '#C4C4C4'}
-              keyboardType="phone-pad"
-              maxLength={11}
-            />
-          </View>
-
-          {/* Continue button */}
           <View style={{ marginTop: vs(16) }}>
             <PrimaryButton
               title="Continue"
               onPress={handleContinue}
-              disabled={cleanPhone.length < 7 || isLoading}
-              style={cleanPhone.length < 7 ? { opacity: 0.6 } : undefined}
+              disabled={!phoneReady || isLoading}
+              style={!phoneReady ? { opacity: 0.6 } : undefined}
             />
           </View>
         </View>
 
-        {/* Social sign-up */}
         <View style={[styles.socialGroup, { marginTop: vs(24), paddingHorizontal: hs(21) }]}>
-          {/* Google */}
           <Pressable
             onPress={handleGoogleSignIn}
-            disabled={!googleRequest || isLoading}
+            disabled={isLoading}
             style={[
               styles.socialBtn,
               {
@@ -244,11 +172,10 @@ export function CreateAccountScreen({ navigation }: Props) {
                 borderWidth: 0.4,
                 borderRadius: ms(12),
                 height: vs(44),
-                opacity: !googleRequest ? 0.7 : 1,
               },
             ]}
           >
-            {googleCodeMutation.isPending ? (
+            {googleSignIn.isPending ? (
               <ActivityIndicator size="small" color={titleColor} />
             ) : (
               <GoogleLogo width={24} height={24} />
@@ -258,7 +185,6 @@ export function CreateAccountScreen({ navigation }: Props) {
             </Text>
           </Pressable>
 
-          {/* Apple (iOS only) */}
           {appleAvailable && (
             <Pressable
               onPress={handleAppleSignIn}
@@ -277,7 +203,7 @@ export function CreateAccountScreen({ navigation }: Props) {
               {appleAuthMutation.isPending ? (
                 <ActivityIndicator size="small" color={titleColor} />
               ) : (
-                <AppleLogo width={20} height={24} />
+                <AppleLogo width={20} height={24} color={socialTextColor} />
               )}
               <Text style={[styles.socialBtnText, { color: socialTextColor, fontSize: fs(10) }]}>
                 Sign up with Apple
@@ -286,7 +212,6 @@ export function CreateAccountScreen({ navigation }: Props) {
           )}
         </View>
 
-        {/* Login link */}
         <View style={[styles.loginRow, { marginTop: vs(20) }]}>
           <Text style={[styles.loginText, { color: linkSecondary, fontSize: fs(12) }]}>
             Already have an account?{' '}
@@ -306,11 +231,6 @@ export function CreateAccountScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   scroll: { flexGrow: 1 },
   fieldGroup: {},
-  fieldLabel: { fontWeight: '400' },
-  phoneRow: { flexDirection: 'row', alignItems: 'center' },
-  flagBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  flagText: { fontWeight: '400' },
-  phoneInput: { fontWeight: '400' },
   socialGroup: {},
   socialBtn: {
     flexDirection: 'row',

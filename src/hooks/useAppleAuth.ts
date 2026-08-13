@@ -2,7 +2,7 @@ import { Platform } from 'react-native';
 import * as AppleAuthentication from 'expo-apple-authentication';
 
 export type AppleAuthResult =
-  | { success: true; identityToken: string; fullName?: string }
+  | { success: true; identityToken: string; fullName?: string; email?: string }
   | { success: false; error: string };
 
 export async function signInWithApple(): Promise<AppleAuthResult> {
@@ -33,6 +33,7 @@ export async function signInWithApple(): Promise<AppleAuthResult> {
       success: true,
       identityToken: credential.identityToken,
       fullName: fullName || undefined,
+      email: credential.email ?? undefined,
     };
   } catch (err: any) {
     if (err.code === 'ERR_CANCELED') {

@@ -22,6 +22,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { refetch: refetchMe, isFetching: isMeLoading } = useGetMeQuery({
     enabled: !!token,
     retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   const loginMutation = useLoginMutation();

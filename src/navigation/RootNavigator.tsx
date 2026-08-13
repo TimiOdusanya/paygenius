@@ -37,8 +37,56 @@ import {
   AccountLinkedScreen,
 } from "@/screens/Budget";
 import { AddDebitCardScreen } from "@/screens/Wallet";
+import { ProfileScreen } from "@/screens/Profile";
+import {
+  SavingsHubScreen,
+  SaveIntroScreen,
+  CreateGoalScreen,
+  SetHowYouSaveScreen,
+  SaveFromScreen,
+  SaveAccountScreen,
+  SavePleaseWaitScreen,
+  SaveAccountLinkedScreen,
+  GoalCreatedScreen,
+  GoalDetailScreen,
+} from "@/screens/Save";
+import {
+  LendHubScreen,
+  LinkLoanProviderScreen,
+  LinkLoanAccountScreen,
+  LendPleaseWaitScreen,
+  LoanDetailScreen,
+} from "@/screens/Lend";
+import type { SaveGoalDraft } from "@/services/savings/savings.type";
+import type { LinkLoanPayload } from "@/services/loans/loans.type";
+import type { BillPayDraft, BillPayment } from "@/services/bills/bills.type";
+import {
+  PayBillsHubScreen,
+  AirtimeScreen,
+  DataScreen,
+  ElectricityScreen,
+  TelevisionScreen,
+  BillPinScreen,
+  BillReceiptScreen,
+} from "@/screens/Bills";
 import { MainTabNavigator } from "./MainTabNavigator";
 import { useTheme } from "@/context/ThemeContext";
+import {
+  NotificationInboxScreen,
+  NotificationPreferencesScreen,
+  SecurityCenterScreen,
+  FaceIdSetupScreen,
+  ChangePasswordScreen,
+  ChangePinScreen,
+  CustomerServiceScreen,
+  SupportChatScreen,
+  RateUsScreen,
+  AboutUsScreen,
+  ReferralsScreen,
+  StatementScreen,
+  TransactionLimitsScreen,
+  DeleteAccountScreen,
+} from "@/screens/Settings";
 
 export type RootStackParamList = {
   Splash: undefined;
@@ -63,7 +111,7 @@ export type RootStackParamList = {
   AccountCreated: undefined;
   // Auth – Login
   Login: undefined;
-  LoginWithPassword: undefined;
+  LoginWithPassword: { phoneNumber?: string } | undefined;
   // Main app
   Main: undefined;
   // Budget flow
@@ -73,18 +121,67 @@ export type RootStackParamList = {
     budgetName: string;
     amount: number;
     period: 'WEEKLY' | 'MONTHLY';
-    selectedDate: string;
+    startDate: string;
+    endDate: string;
   };
   PleaseWait: {
     budgetName: string;
     amount: number;
     period: 'WEEKLY' | 'MONTHLY';
-    selectedDate: string;
+    startDate: string;
+    endDate: string;
     accountId: string;
   };
   AccountLinked: { budgetName: string };
   // Wallet flow
-  AddDebitCard: undefined;
+  AddDebitCard: { saveDraft?: SaveGoalDraft } | undefined;
+  // Save flow
+  SavingsHub: undefined;
+  SaveIntro: undefined;
+  CreateGoal: undefined;
+  SetHowYouSave: {
+    name: string;
+    targetAmount: number;
+    description?: string;
+    targetDate?: string;
+  };
+  SaveFrom: Omit<SaveGoalDraft, 'sourceType' | 'linkedAccountId'>;
+  SaveAccount: SaveGoalDraft;
+  SavePleaseWait: SaveGoalDraft;
+  SaveAccountLinked: { goalName: string; goalId: string };
+  GoalCreated: { goalName: string; goalId: string };
+  GoalDetail: { goalId: string };
+  // Profile
+  Profile: undefined;
+  // Lend flow
+  LendHub: undefined;
+  LinkLoanProvider: undefined;
+  LinkLoanAccount: { providerCode: string; providerName: string };
+  LendPleaseWait: LinkLoanPayload;
+  LoanDetail: { loanId: string };
+  // Pay bills
+  PayBills: undefined;
+  BillAirtime: undefined;
+  BillData: undefined;
+  BillElectricity: undefined;
+  BillTelevision: undefined;
+  BillPin: BillPayDraft;
+  BillReceipt: { payment: BillPayment };
+  // Settings + notifications
+  NotificationInbox: undefined;
+  NotificationPreferences: undefined;
+  SecurityCenter: undefined;
+  FaceIdSetup: undefined;
+  ChangePassword: undefined;
+  ChangePin: undefined;
+  CustomerService: undefined;
+  SupportChat: undefined;
+  RateUs: undefined;
+  AboutUs: undefined;
+  Referrals: undefined;
+  StatementLog: undefined;
+  TransactionLimits: undefined;
+  DeleteAccount: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -152,6 +249,73 @@ export function RootNavigator() {
 
       {/* Wallet flow */}
       <Stack.Screen name="AddDebitCard" component={AddDebitCardScreen} />
+
+      {/* Save flow */}
+      <Stack.Screen name="SavingsHub" component={SavingsHubScreen} />
+      <Stack.Screen name="SaveIntro" component={SaveIntroScreen} />
+      <Stack.Screen name="CreateGoal" component={CreateGoalScreen} />
+      <Stack.Screen name="SetHowYouSave" component={SetHowYouSaveScreen} />
+      <Stack.Screen name="SaveFrom" component={SaveFromScreen} />
+      <Stack.Screen name="SaveAccount" component={SaveAccountScreen} />
+      <Stack.Screen
+        name="SavePleaseWait"
+        component={SavePleaseWaitScreen}
+        options={{ animation: "fade", gestureEnabled: false }}
+      />
+      <Stack.Screen
+        name="SaveAccountLinked"
+        component={SaveAccountLinkedScreen}
+        options={{ animation: "fade", gestureEnabled: false }}
+      />
+      <Stack.Screen
+        name="GoalCreated"
+        component={GoalCreatedScreen}
+        options={{ animation: "fade", gestureEnabled: false }}
+      />
+      <Stack.Screen name="GoalDetail" component={GoalDetailScreen} />
+
+      {/* Profile */}
+      <Stack.Screen name="Profile" component={ProfileScreen} />
+
+      {/* Lend flow */}
+      <Stack.Screen name="LendHub" component={LendHubScreen} />
+      <Stack.Screen name="LinkLoanProvider" component={LinkLoanProviderScreen} />
+      <Stack.Screen name="LinkLoanAccount" component={LinkLoanAccountScreen} />
+      <Stack.Screen
+        name="LendPleaseWait"
+        component={LendPleaseWaitScreen}
+        options={{ animation: "fade", gestureEnabled: false }}
+      />
+      <Stack.Screen name="LoanDetail" component={LoanDetailScreen} />
+
+      {/* Pay bills */}
+      <Stack.Screen name="PayBills" component={PayBillsHubScreen} />
+      <Stack.Screen name="BillAirtime" component={AirtimeScreen} />
+      <Stack.Screen name="BillData" component={DataScreen} />
+      <Stack.Screen name="BillElectricity" component={ElectricityScreen} />
+      <Stack.Screen name="BillTelevision" component={TelevisionScreen} />
+      <Stack.Screen name="BillPin" component={BillPinScreen} />
+      <Stack.Screen
+        name="BillReceipt"
+        component={BillReceiptScreen}
+        options={{ animation: "fade", gestureEnabled: false }}
+      />
+
+      {/* Settings + notifications */}
+      <Stack.Screen name="NotificationInbox" component={NotificationInboxScreen} />
+      <Stack.Screen name="NotificationPreferences" component={NotificationPreferencesScreen} />
+      <Stack.Screen name="SecurityCenter" component={SecurityCenterScreen} />
+      <Stack.Screen name="FaceIdSetup" component={FaceIdSetupScreen} />
+      <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
+      <Stack.Screen name="ChangePin" component={ChangePinScreen} />
+      <Stack.Screen name="CustomerService" component={CustomerServiceScreen} />
+      <Stack.Screen name="SupportChat" component={SupportChatScreen} />
+      <Stack.Screen name="RateUs" component={RateUsScreen} />
+      <Stack.Screen name="AboutUs" component={AboutUsScreen} />
+      <Stack.Screen name="Referrals" component={ReferralsScreen} />
+      <Stack.Screen name="StatementLog" component={StatementScreen} />
+      <Stack.Screen name="TransactionLimits" component={TransactionLimitsScreen} />
+      <Stack.Screen name="DeleteAccount" component={DeleteAccountScreen} />
     </Stack.Navigator>
   );
 }

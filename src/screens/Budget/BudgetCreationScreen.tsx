@@ -14,117 +14,12 @@ import { useTheme } from '@/context/ThemeContext';
 import { useResponsive } from '@/hooks/useResponsive';
 import { useAuthStore } from '@/stores';
 import { BackButton } from '@/components/BackButton';
+import { formatAmountInput, parseAmountInput } from '@/utils/amount';
+import { BudgetCalendar, toISODate } from './BudgetCalendar';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'BudgetCreation'>;
 
-const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December'];
-
-const DAYS_IN_MONTH = (month: number, year: number) => new Date(year, month + 1, 0).getDate();
-
-interface CalendarProps {
-  selectedDate: Date;
-  onSelect: (date: Date) => void;
-  isDark: boolean;
-  ms: (n: number) => number;
-  vs: (n: number) => number;
-  fs: (n: number) => number;
-}
-
-function Calendar({ selectedDate, onSelect, isDark, ms, vs, fs }: CalendarProps) {
-  const [viewDate, setViewDate] = useState(selectedDate);
-  const year = viewDate.getFullYear();
-  const month = viewDate.getMonth();
-  const daysInMonth = DAYS_IN_MONTH(month, year);
-  const firstDay = new Date(year, month, 1).getDay();
-
-  const cardBg = isDark ? '#1E1E2E' : '#FFFFFF';
-  const textColor = isDark ? '#FFFFFF' : '#1A1D23';
-  const subColor = '#858585';
-  const selectedBg = '#191970';
-  const todayBg = isDark ? '#3A3A8A' : '#3A3A8A';
-  const today = new Date();
-
-  const prevMonth = () => {
-    const d = new Date(viewDate);
-    d.setMonth(d.getMonth() - 1);
-    setViewDate(d);
-  };
-
-  const nextMonth = () => {
-    const d = new Date(viewDate);
-    d.setMonth(d.getMonth() + 1);
-    setViewDate(d);
-  };
-
-  const cells: (number | null)[] = [...Array(firstDay).fill(null)];
-  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
-
-  return (
-    <View style={[styles.calendarCard, { backgroundColor: cardBg, borderRadius: ms(12), padding: ms(16) }]}>
-      {/* Month nav */}
-      <View style={styles.calMonthRow}>
-        <Text style={[styles.calMonthTitle, { color: textColor, fontSize: fs(14) }]}>
-          {MONTHS[month]} {year}
-        </Text>
-        <View style={styles.calNavRow}>
-          <Pressable onPress={prevMonth} hitSlop={8} style={styles.calNavBtn}>
-            <Text style={[styles.calNavArrow, { color: textColor, fontSize: fs(14) }]}>{'‹'}</Text>
-          </Pressable>
-          <Pressable onPress={nextMonth} hitSlop={8} style={styles.calNavBtn}>
-            <Text style={[styles.calNavArrow, { color: textColor, fontSize: fs(14) }]}>{'›'}</Text>
-          </Pressable>
-        </View>
-      </View>
-
-      {/* Day of week headers */}
-      <View style={styles.calDowRow}>
-        {['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'].map((d) => (
-          <Text key={d} style={[styles.calDow, { color: subColor, fontSize: fs(9) }]}>{d}</Text>
-        ))}
-      </View>
-
-      {/* Days grid */}
-      <View style={styles.calDaysGrid}>
-        {cells.map((day, i) => {
-          if (day === null) {
-            return <View key={`null-${i}`} style={styles.calDayCell} />;
-          }
-          const thisDate = new Date(year, month, day);
-          const isSelected =
-            selectedDate.getDate() === day &&
-            selectedDate.getMonth() === month &&
-            selectedDate.getFullYear() === year;
-          const isToday =
-            today.getDate() === day &&
-            today.getMonth() === month &&
-            today.getFullYear() === year;
-
-          return (
-            <Pressable
-              key={day}
-              onPress={() => onSelect(new Date(year, month, day))}
-              style={[
-                styles.calDayCell,
-                isSelected && { backgroundColor: selectedBg, borderRadius: ms(20) },
-                !isSelected && isToday && { backgroundColor: todayBg, borderRadius: ms(20) },
-              ]}
-            >
-              <Text style={[
-                styles.calDayText,
-                { color: isSelected || isToday ? '#FFFFFF' : textColor, fontSize: fs(12) },
-              ]}>
-                {day}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-    </View>
-  );
-}
-
-export function BudgetCreationScreen({ navigation, route }: Props) {
+export function BudgetCreationScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { isDark } = useTheme();
   const { hs, vs, fs, ms } = useResponsive();
@@ -133,7 +28,8 @@ export function BudgetCreationScreen({ navigation, route }: Props) {
   const [budgetName, setBudgetName] = useState('');
   const [amount, setAmount] = useState('');
   const [period, setPeriod] = useState<'WEEKLY' | 'MONTHLY'>('WEEKLY');
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [startDate, setStartDate] = useState<Date | null>(null);
+  const [endDate, setEndDate] = useState<Date | null>(null);
 
   const firstName = user?.firstName ?? 'there';
 
@@ -150,16 +46,21 @@ export function BudgetCreationScreen({ navigation, route }: Props) {
   const labelGreenBg = isDark ? '#0A3A2A' : '#AFE9D6';
 
   const handleContinue = () => {
-    if (!budgetName.trim() || !amount.trim()) return;
+    if (!budgetName.trim() || !amount.trim() || !startDate) return;
     navigation.navigate('BudgetAccountSelection', {
       budgetName: budgetName.trim(),
-      amount: parseFloat(amount),
+      amount: parseAmountInput(amount),
       period,
-      selectedDate: `${selectedDate.getDate()} ${MONTHS[selectedDate.getMonth()]} ${selectedDate.getFullYear()}`,
+      startDate: toISODate(startDate),
+      endDate: toISODate(endDate ?? startDate),
     });
   };
 
-  const canContinue = budgetName.trim().length > 0 && amount.trim().length > 0 && parseFloat(amount) > 0;
+  const canContinue =
+    budgetName.trim().length > 0 &&
+    amount.trim().length > 0 &&
+    parseAmountInput(amount) > 0 &&
+    startDate != null;
 
   return (
     <View style={[styles.container, { backgroundColor: bg, paddingTop: insets.top }]}>
@@ -221,10 +122,10 @@ export function BudgetCreationScreen({ navigation, route }: Props) {
           {/* Amount */}
           <TextInput
             value={amount}
-            onChangeText={setAmount}
+            onChangeText={(text) => setAmount(formatAmountInput(text))}
             placeholder="Enter Amount"
             placeholderTextColor={placeholderColor}
-            keyboardType="numeric"
+            keyboardType="decimal-pad"
             style={[
               styles.input,
               {
@@ -278,12 +179,14 @@ export function BudgetCreationScreen({ navigation, route }: Props) {
 
           {/* Calendar */}
           <View style={{ marginTop: vs(16) }}>
-            <Calendar
-              selectedDate={selectedDate}
-              onSelect={setSelectedDate}
+            <BudgetCalendar
+              startDate={startDate}
+              endDate={endDate}
+              onChange={({ start, end }) => {
+                setStartDate(start);
+                setEndDate(end);
+              }}
               isDark={isDark}
-              ms={ms}
-              vs={vs}
               fs={fs}
             />
           </View>
@@ -335,23 +238,6 @@ const styles = StyleSheet.create({
   periodRow: { flexDirection: 'row', alignItems: 'center' },
   periodPill: { alignItems: 'center', justifyContent: 'center' },
   periodText: { fontWeight: '400' },
-  calendarCard: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  calMonthRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
-  calMonthTitle: { fontWeight: '500' },
-  calNavRow: { flexDirection: 'row', gap: 8 },
-  calNavBtn: { padding: 4 },
-  calNavArrow: { fontWeight: '400' },
-  calDowRow: { flexDirection: 'row', marginBottom: 4 },
-  calDow: { flex: 1, textAlign: 'center', fontWeight: '400' },
-  calDaysGrid: { flexDirection: 'row', flexWrap: 'wrap' },
-  calDayCell: { width: '14.28%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center' },
-  calDayText: { fontWeight: '400', textAlign: 'center' },
   continueBtn: { alignItems: 'center', justifyContent: 'center', paddingVertical: 18 },
   continueBtnText: { color: '#FFFFFF', fontWeight: '600' },
 });

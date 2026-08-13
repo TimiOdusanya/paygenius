@@ -8,7 +8,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,60 +16,69 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/RootNavigator';
 import { FormInput, PasswordInput } from '@/components/FormInput';
 import { Header } from '@/components/Header';
+import { PhoneNumberField } from '@/components/PhoneNumberField';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { useTheme } from '@/context/ThemeContext';
 import { useResponsive } from '@/hooks/useResponsive';
 import { useTrackOnboardingRoute } from '@/hooks/useTrackOnboardingRoute';
 import { useLoginMutation, useLoginBiometricMutation } from '@/services/auth/auth.query';
 import { navigateAfterAuth } from '@/navigation/navigateAfterAuth';
-import { useAuthStore } from '@/stores';
+import { useAuthStore, usePreferencesStore } from '@/stores';
 import { getApiErrorMessage } from '@/utils/errors';
-
-/** Convert a local Nigerian phone entry to E.164 so the backend finds the account */
-function buildIdentifier(input: string, mode: 'phone' | 'other'): string {
-  if (mode !== 'phone') return input.trim();
-  const digits = input.replace(/\D/g, '');
-  if (!digits) return input.trim();
-  if (digits.startsWith('0') && digits.length === 11) return `+234${digits.slice(1)}`;
-  if (digits.length === 10) return `+234${digits}`;
-  if (digits.startsWith('234') && digits.length === 13) return `+${digits}`;
-  return `+${digits}`;
-}
+import { isValidLocalPhone, toE164, toLocalDigits } from '@/utils/phone';
+import FaceIdIcon from '../../../assets/images/auth/faceid-icon.svg';
 
 const FINGERPRINT_IMG = require('../../../assets/images/auth/fingerprint.png');
-const FACEID_IMG = require('../../../assets/images/auth/faceid-icon.png');
 
-type BiometricType = 'fingerprint' | 'faceid' | null;
 type Props = NativeStackScreenProps<RootStackParamList, 'LoginWithPassword'>;
 
-export function LoginWithPasswordScreen({ navigation }: Props) {
+export function LoginWithPasswordScreen({ navigation, route }: Props) {
   useTrackOnboardingRoute('LoginWithPassword');
   const insets = useSafeAreaInsets();
   const { isDark } = useTheme();
-  const { hs, vs, fs, ms } = useResponsive();
+  const { hs, vs, fs } = useResponsive();
+  const user = useAuthStore((s) => s.user);
+  const region = usePreferencesStore((s) => s.region);
 
-  const [phoneInput, setPhoneInput] = useState('');
-  // 'phone' shows the NGN flag+prefix input; 'other' shows a plain email/username field
-  const [inputMode, setInputMode] = useState<'phone' | 'other'>('phone');
-  const [otherInput, setOtherInput] = useState('');
+  const lastPhoneNumber = usePreferencesStore((s) => s.lastPhoneNumber);
+  const rememberedEmail = user?.email?.trim() ?? '';
+  const rememberedPhone =
+    user?.phoneNumber?.trim() || lastPhoneNumber?.trim() || '';
+  const incomingPhone = route.params?.phoneNumber?.trim() ?? '';
+
+  const [inputMode, setInputMode] = useState<'phone' | 'other'>(
+    rememberedEmail && !rememberedPhone && !incomingPhone ? 'other' : 'phone'
+  );
+  const [phoneInput, setPhoneInput] = useState(
+    incomingPhone
+      ? toLocalDigits(incomingPhone, region)
+      : rememberedPhone
+        ? toLocalDigits(rememberedPhone, region)
+        : ''
+  );
+  const [otherInput, setOtherInput] = useState(rememberedEmail);
   const [password, setPassword] = useState('');
-  const [hasBiometrics, setHasBiometrics] = useState(false);
-  const [biometricType, setBiometricType] = useState<BiometricType>(null);
+  const [supportsFingerprint, setSupportsFingerprint] = useState(false);
+  const [supportsFaceId, setSupportsFaceId] = useState(false);
+
+  useEffect(() => {
+    const stored = incomingPhone || rememberedPhone;
+    if (!stored) return;
+    setPhoneInput((current) =>
+      current ? current : toLocalDigits(stored, region)
+    );
+  }, [incomingPhone, rememberedPhone, region]);
 
   const loginMutation = useLoginMutation();
   const loginBiometricMutation = useLoginBiometricMutation();
-  const user = useAuthStore((s) => s.user);
-
-  // When the user is already known, prefill identifier from the cache
-  const cachedPhone = user?.phoneNumber ?? null;
-  const hasKnownUser = !!cachedPhone;
 
   const bg = isDark ? '#1A1A1A' : '#FAFAFC';
   const titleColor = isDark ? '#FFFFFF' : '#191970';
-  const subtitleColor = isDark ? '#AAAAAA' : '#6D6D8C';
   const biometricLabelColor = '#6D6D8C';
   const fingerprintBg = isDark ? '#1E3A2F' : '#AFE9D6';
   const fingerprintBorderColor = isDark ? '#2E5040' : '#D8C4FA';
+  const avatarBg = isDark ? '#4A3A6A' : '#E5D8FB';
+  const displayName = user?.firstName?.trim() ?? '';
 
   useEffect(() => {
     (async () => {
@@ -80,19 +88,31 @@ export function LoginWithPasswordScreen({ navigation }: Props) {
         const enrolled = await LocalAuthentication.isEnrolledAsync();
         if (!enrolled) return;
         const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
-        setHasBiometrics(true);
-        if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
-          setBiometricType('faceid');
-        } else if (types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
-          setBiometricType('fingerprint');
-        }
+        setSupportsFaceId(
+          types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)
+        );
+        setSupportsFingerprint(
+          types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)
+        );
       } catch {}
     })();
   }, []);
 
+  const identifier =
+    inputMode === 'other'
+      ? otherInput.trim()
+      : toE164(phoneInput, region) || rememberedPhone;
+
+  const identifierReady =
+    inputMode === 'other' ? otherInput.trim().length >= 3 : isValidLocalPhone(phoneInput, region);
+
   const handleBiometric = async () => {
-    if (!cachedPhone) {
-      Alert.alert('Error', 'No phone number found. Please enter your details below.');
+    const biometricId = rememberedPhone || (inputMode === 'phone' ? identifier : '');
+    if (!biometricId) {
+      Alert.alert(
+        'Sign in first',
+        'Enter the phone number you registered with, then use biometrics.'
+      );
       return;
     }
     try {
@@ -102,7 +122,7 @@ export function LoginWithPasswordScreen({ navigation }: Props) {
       });
       if (result.success) {
         loginBiometricMutation.mutate(
-          { phoneNumber: cachedPhone },
+          { phoneNumber: biometricId },
           {
             onSuccess: () => navigateAfterAuth(navigation),
             onError: (err) => {
@@ -117,23 +137,19 @@ export function LoginWithPasswordScreen({ navigation }: Props) {
   };
 
   const handleLogin = () => {
-    let loginIdentifier: string;
-    if (hasKnownUser) {
-      loginIdentifier = cachedPhone!;
-    } else if (inputMode === 'phone') {
-      loginIdentifier = buildIdentifier(phoneInput, 'phone');
-    } else {
-      loginIdentifier = otherInput.trim();
-    }
-
-    if (!loginIdentifier) {
-      Alert.alert('Required', 'Please enter your phone number, email, or username.');
+    if (!identifierReady) {
+      Alert.alert(
+        'Required',
+        inputMode === 'other'
+          ? 'Enter the email or username you registered with.'
+          : 'Enter the phone number you registered with.'
+      );
       return;
     }
     if (password.length < 6) return;
 
     loginMutation.mutate(
-      { identifier: loginIdentifier, password },
+      { identifier, password },
       {
         onSuccess: () => navigateAfterAuth(navigation),
         onError: (err) => {
@@ -144,15 +160,7 @@ export function LoginWithPasswordScreen({ navigation }: Props) {
   };
 
   const isLoading = loginMutation.isPending || loginBiometricMutation.isPending;
-  const displayName = user?.firstName ?? '';
-
-  const identifierFilled = inputMode === 'phone'
-    ? phoneInput.replace(/\D/g, '').length >= 10
-    : otherInput.trim().length >= 3;
-
-  const canSubmit = hasKnownUser
-    ? password.length >= 6
-    : identifierFilled && password.length >= 6;
+  const canSubmit = identifierReady && password.length >= 6;
 
   return (
     <KeyboardAvoidingView
@@ -173,130 +181,72 @@ export function LoginWithPasswordScreen({ navigation }: Props) {
         <View style={[styles.inner, { paddingHorizontal: hs(21) }]}>
           <Header
             onBack={() => navigation.goBack()}
-            title={displayName ? `Welcome back, ${displayName}` : 'Welcome back'}
-            description="Enter your password to continue"
+            title={displayName ? `Welcome Back ${displayName}` : 'Welcome Back'}
+            description="Please enter your password"
           />
 
-          {/* Avatar — only when we know who the user is */}
-          {hasKnownUser && (
-            <View style={[styles.avatarWrap, { marginTop: vs(20) }]}>
-              <View
-                style={[
-                  styles.avatarCircle,
-                  {
-                    width: vs(69),
-                    height: vs(69),
-                    borderRadius: vs(35),
-                    backgroundColor: isDark ? '#4A3A6A' : '#E5D8FB',
-                  },
-                ]}
-              >
-                <Text style={{ fontSize: vs(32) }}>
-                  {displayName ? displayName[0].toUpperCase() : '😊'}
-                </Text>
-              </View>
-              {displayName ? (
-                <Text style={[styles.userName, { color: titleColor, fontSize: fs(14), marginTop: vs(8) }]}>
-                  Hi, {displayName}
-                </Text>
-              ) : null}
+          <View style={[styles.avatarWrap, { marginTop: vs(20) }]}>
+            <View
+              style={[
+                styles.avatarCircle,
+                {
+                  width: vs(69),
+                  height: vs(69),
+                  borderRadius: vs(35),
+                  backgroundColor: avatarBg,
+                  shadowColor: '#E3B9F5',
+                  shadowOpacity: 0.7,
+                  shadowRadius: 8,
+                  shadowOffset: { width: 0, height: 0 },
+                },
+              ]}
+            >
+              <Text style={{ fontSize: vs(32) }}>
+                {displayName ? displayName[0].toUpperCase() : '😊'}
+              </Text>
             </View>
-          )}
+          </View>
 
-          {/* Identifier section — only when device has no cached user */}
-          {!hasKnownUser && (
-            <View style={{ marginTop: vs(24), width: '100%' }}>
-              {inputMode === 'phone' ? (
-                <>
-                  <Text style={[styles.fieldLabel, { color: isDark ? '#CCCCCC' : '#1A1D23', fontSize: fs(10) }]}>
-                    Phone number
-                  </Text>
-                  <View style={[styles.phoneRow, { marginTop: vs(8), gap: hs(6) }]}>
-                    {/* Country flag + code badge */}
-                    <View
-                      style={[
-                        styles.flagBadge,
-                        {
-                          backgroundColor: isDark ? '#2A2A5A' : '#C0C0F1',
-                          borderColor: isDark ? '#3B3B3B' : '#191970',
-                          borderRadius: ms(12),
-                          height: vs(44),
-                          paddingHorizontal: hs(12),
-                          minWidth: ms(73),
-                        },
-                      ]}
-                    >
-                      <Text style={{ fontSize: ms(14) }}>🇳🇬</Text>
-                      <Text style={[styles.flagCode, { color: '#FFFFFF', fontSize: fs(11) }]}>+234</Text>
-                    </View>
+          <View style={{ marginTop: vs(24), width: '100%' }}>
+            {inputMode === 'phone' ? (
+              <PhoneNumberField value={phoneInput} onChangeText={setPhoneInput} />
+            ) : (
+              <FormInput
+                label="Email or Username"
+                value={otherInput}
+                onChangeText={setOtherInput}
+                placeholder="you@email.com or @username"
+                autoCapitalize="none"
+                keyboardType="email-address"
+                autoCorrect={false}
+              />
+            )}
+            <Pressable
+              onPress={() => {
+                setInputMode((m) => (m === 'phone' ? 'other' : 'phone'));
+                setPhoneInput('');
+                setOtherInput('');
+              }}
+              style={{ marginTop: vs(8), alignSelf: 'flex-end' }}
+              hitSlop={8}
+            >
+              <Text style={[styles.toggleLink, { color: isDark ? '#A0A0FF' : '#191970', fontSize: fs(11) }]}>
+                {inputMode === 'phone' ? 'Use email or username instead' : 'Use phone number instead'}
+              </Text>
+            </Pressable>
+          </View>
 
-                    {/* Local number input */}
-                    <TextInput
-                      style={[
-                        styles.phoneInput,
-                        {
-                          flex: 1,
-                          borderColor: isDark ? '#3B3B3B' : '#191970',
-                          backgroundColor: isDark ? '#1E1E2E' : '#FAFAFC',
-                          color: isDark ? '#FFFFFF' : '#1A1D23',
-                          fontSize: fs(11),
-                          height: vs(44),
-                          borderRadius: ms(12),
-                          paddingHorizontal: hs(14),
-                          borderWidth: 0.4,
-                        },
-                      ]}
-                      value={phoneInput}
-                      onChangeText={setPhoneInput}
-                      placeholder="8012345678"
-                      placeholderTextColor={isDark ? '#666' : '#C4C4C4'}
-                      keyboardType="phone-pad"
-                      maxLength={11}
-                    />
-                  </View>
-                </>
-              ) : (
-                <FormInput
-                  label="Email or Username"
-                  value={otherInput}
-                  onChangeText={setOtherInput}
-                  placeholder="you@email.com or @username"
-                  autoCapitalize="none"
-                  keyboardType="email-address"
-                  autoCorrect={false}
-                />
-              )}
-
-              {/* Toggle between phone and email/username */}
-              <Pressable
-                onPress={() => {
-                  setInputMode((m) => (m === 'phone' ? 'other' : 'phone'));
-                  setPhoneInput('');
-                  setOtherInput('');
-                }}
-                style={{ marginTop: vs(8), alignSelf: 'flex-end' }}
-                hitSlop={8}
-              >
-                <Text style={[styles.toggleLink, { color: isDark ? '#A0A0FF' : '#191970', fontSize: fs(11) }]}>
-                  {inputMode === 'phone' ? 'Use email or username instead' : 'Use phone number instead'}
-                </Text>
-              </Pressable>
-            </View>
-          )}
-
-          {/* Password field */}
-          <View style={{ marginTop: vs(hasKnownUser ? 24 : 12), width: '100%' }}>
+          <View style={{ marginTop: vs(16), width: '100%' }}>
             <PasswordInput
-              label="Password"
+              label="Enter password"
               value={password}
               onChangeText={setPassword}
-              placeholder="••••••••"
+              placeholder="********"
             />
           </View>
 
-          {/* Biometric — only when user is already known */}
-          {hasKnownUser && hasBiometrics && biometricType === 'fingerprint' && (
-            <View style={[styles.biometricWrap, { marginTop: vs(20) }]}>
+          {supportsFingerprint && (
+            <View style={[styles.biometricWrap, { marginTop: vs(24) }]}>
               <Text style={[styles.biometricLabel, { color: biometricLabelColor, fontSize: fs(12) }]}>
                 or use fingerprint
               </Text>
@@ -320,27 +270,13 @@ export function LoginWithPasswordScreen({ navigation }: Props) {
             </View>
           )}
 
-          {hasKnownUser && hasBiometrics && biometricType === 'faceid' && (
+          {supportsFaceId && (
             <View style={[styles.biometricWrap, { marginTop: vs(20) }]}>
               <Text style={[styles.biometricLabel, { color: biometricLabelColor, fontSize: fs(12) }]}>
                 Face ID
               </Text>
               <Pressable onPress={handleBiometric} style={[styles.fingerprintBtn, { marginTop: vs(12) }]}>
-                <View
-                  style={[
-                    styles.fingerprintCircle,
-                    {
-                      width: vs(68),
-                      height: vs(68),
-                      borderRadius: vs(34),
-                      backgroundColor: isDark ? '#3A2A6A' : '#E5D8FB',
-                      borderColor: fingerprintBorderColor,
-                      borderWidth: 4,
-                    },
-                  ]}
-                >
-                  <Image source={FACEID_IMG} style={{ width: vs(40), height: vs(40) }} resizeMode="contain" />
-                </View>
+                <FaceIdIcon width={vs(40)} height={vs(40)} color={isDark ? '#FFFFFF' : '#000000'} />
               </Pressable>
             </View>
           )}
@@ -364,12 +300,6 @@ const styles = StyleSheet.create({
   inner: { flex: 1, alignItems: 'center' },
   avatarWrap: { alignItems: 'center' },
   avatarCircle: { alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  userName: { fontWeight: '500', textAlign: 'center' },
-  fieldLabel: { fontWeight: '400' },
-  phoneRow: { flexDirection: 'row', alignItems: 'center' },
-  flagBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 0.4, justifyContent: 'center' },
-  flagCode: { fontWeight: '400' },
-  phoneInput: { fontWeight: '400' },
   toggleLink: { fontWeight: '400', textDecorationLine: 'underline' },
   biometricWrap: { alignItems: 'center', width: '100%' },
   biometricLabel: { fontWeight: '400', textAlign: 'center' },

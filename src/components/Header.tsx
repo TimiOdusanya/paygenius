@@ -25,6 +25,7 @@ type HeaderProps = {
   description?: string;
   titleAlign?: HeaderTitleAlign;
   descriptionAlign?: HeaderDescriptionAlign;
+  descriptionColor?: string;
   /**
    * `auth` — KYC / login form header (16px title, 12px subtitle, navy).
    * `bar` — top controls only (onboarding marketing slides).
@@ -42,6 +43,7 @@ export function Header({
   description,
   titleAlign = 'center',
   descriptionAlign = 'center',
+  descriptionColor: descriptionColorProp,
   variant = 'auth',
   style,
 }: HeaderProps) {
@@ -49,7 +51,8 @@ export function Header({
   const { fs, vs } = useResponsive();
 
   const titleColor = isDark ? '#FFFFFF' : '#191970';
-  const descriptionColor = isDark ? '#CCCCCC' : '#858585';
+  const descriptionColor =
+    descriptionColorProp ?? (isDark ? '#CCCCCC' : '#858585');
   const skipColor = isDark ? '#FFFFFF' : '#191970';
 
   const resolvedRight =

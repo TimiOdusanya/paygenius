@@ -19,12 +19,14 @@ type PrimaryButtonProps = PressableProps & {
 /**
  * Reusable primary button: bg #191970, text #FFFFFF, borderRadius 14px, height 54px.
  */
-export function PrimaryButton({ title, style, ...props }: PrimaryButtonProps) {
+export function PrimaryButton({ title, style, disabled, ...props }: PrimaryButtonProps) {
   return (
     <Pressable
+      disabled={disabled}
       style={({ pressed }) => [
         styles.button,
-        pressed && styles.pressed,
+        disabled && styles.disabled,
+        pressed && !disabled && styles.pressed,
         StyleSheet.flatten(style as ViewStyle),
       ]}
       {...props}
@@ -44,6 +46,9 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.85,
+  },
+  disabled: {
+    backgroundColor: '#C4C4C4',
   },
   text: {
     color: TEXT_COLOR,

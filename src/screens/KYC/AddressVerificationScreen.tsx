@@ -116,7 +116,7 @@ export function AddressVerificationScreen({ navigation }: Props) {
             </View>
           </View>
 
-          <View style={[styles.form, { marginTop: vs(16), gap: vs(4) }]}>
+          <View style={[styles.form, { marginTop: vs(16), gap: vs(12) }]}>
             <FormInput
               label="House Number"
               value={houseNumber}

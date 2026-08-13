@@ -3,13 +3,13 @@ import React, {
   useCallback,
   useContext,
   useMemo,
-  useState,
 } from "react";
 import { useColorScheme } from "react-native";
 import type { SemanticColors } from "@/theme/semantic";
 import { darkColors, lightColors } from "@/theme/semantic";
+import { usePreferencesStore, type ThemeMode } from "@/stores/preferences.store";
 
-export type ThemeMode = "light" | "dark" | "system";
+export type { ThemeMode };
 
 type ThemeContextValue = {
   mode: ThemeMode;
@@ -22,14 +22,15 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const systemScheme = useColorScheme();
-  const [mode, setModeState] = useState<ThemeMode>("system");
+  const mode = usePreferencesStore((s) => s.themeMode);
+  const setThemeMode = usePreferencesStore((s) => s.setThemeMode);
 
   const isDark = mode === "system" ? systemScheme === "dark" : mode === "dark";
   const colors: SemanticColors = isDark ? darkColors : lightColors;
 
   const setMode = useCallback((newMode: ThemeMode) => {
-    setModeState(newMode);
-  }, []);
+    setThemeMode(newMode);
+  }, [setThemeMode]);
 
   const value = useMemo<ThemeContextValue>(
     () => ({ mode, isDark, colors, setMode }),

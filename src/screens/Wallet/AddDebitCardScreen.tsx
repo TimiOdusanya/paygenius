@@ -7,253 +7,315 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/RootNavigator';
+import { FormInput, PasswordInput, SelectInput } from '@/components/FormInput';
+import { Header } from '@/components/Header';
+import { PrimaryButton } from '@/components/PrimaryButton';
 import { useTheme } from '@/context/ThemeContext';
 import { useResponsive } from '@/hooks/useResponsive';
-import { BackButton } from '@/components/BackButton';
-import { PrimaryButton } from '@/components/PrimaryButton';
+import { useAddLinkedCardMutation } from '@/services/savings/savings.query';
+import {
+  useGetBanksQuery,
+  useResolveAccountQuery,
+  useResolveCardBinQuery,
+} from '@/services/verify/verify.query';
+import { getApiErrorMessage } from '@/utils/errors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AddDebitCard'>;
 
-interface FormInputFieldProps {
-  label: string;
-  value: string;
-  onChangeText: (text: string) => void;
-  placeholder?: string;
-  keyboardType?: 'default' | 'numeric';
-  secureTextEntry?: boolean;
-  isDark: boolean;
-  ms: (n: number) => number;
-  vs: (n: number) => number;
-  fs: (n: number) => number;
-  hs: (n: number) => number;
-  showToggle?: boolean;
-  maskPrefix?: string;
+function digitsOnly(value: string, max: number) {
+  return value.replace(/\D/g, '').slice(0, max);
 }
 
-function FormInputField({
-  label, value, onChangeText, placeholder, keyboardType = 'default',
-  secureTextEntry = false, isDark, ms, vs, fs, hs, showToggle = false, maskPrefix,
-}: FormInputFieldProps) {
-  const [visible, setVisible] = useState(!secureTextEntry);
-  const inputBg = isDark ? '#1A1A1A' : '#FAFAFC';
-  const inputBorder = isDark ? '#4A4A8A' : '#191970';
-  const textColor = isDark ? '#FFFFFF' : '#1A1D23';
-  const labelColor = isDark ? '#FFFFFF' : '#000000';
-  const placeholderColor = 'rgba(133,133,133,0.7)';
-
-  return (
-    <View style={{ marginBottom: vs(16) }}>
-      <Text style={[styles.fieldLabel, { color: labelColor, fontSize: fs(11) }]}>
-        {label}
-      </Text>
-      <View style={[
-        styles.fieldWrap,
-        {
-          backgroundColor: inputBg,
-          borderColor: inputBorder,
-          borderWidth: 0.4,
-          borderRadius: ms(12),
-          height: vs(44),
-          marginTop: vs(8),
-        },
-      ]}>
-        {maskPrefix && (
-          <Text style={[styles.maskPrefix, { color: placeholderColor, fontSize: fs(11), paddingLeft: hs(16) }]}>
-            {maskPrefix}
-          </Text>
-        )}
-        <TextInput
-          value={value}
-          onChangeText={onChangeText}
-          placeholder={placeholder}
-          placeholderTextColor={placeholderColor}
-          keyboardType={keyboardType}
-          secureTextEntry={secureTextEntry && !visible}
-          style={[
-            styles.fieldInput,
-            {
-              flex: 1,
-              color: textColor,
-              fontSize: fs(11),
-              paddingHorizontal: hs(16),
-              height: '100%',
-            },
-          ]}
-        />
-        {showToggle && (
-          <Pressable onPress={() => setVisible((v) => !v)} style={{ paddingHorizontal: hs(12) }} hitSlop={8}>
-            <Ionicons
-              name={visible ? 'eye-outline' : 'eye-off-outline'}
-              size={ms(16)}
-              color={isDark ? '#AAAAAA' : '#858585'}
-            />
-          </Pressable>
-        )}
-      </View>
-    </View>
-  );
+function groupInFours(value: string) {
+  return value.replace(/(.{4})/g, '$1 ').trim();
 }
 
-export function AddDebitCardScreen({ navigation }: Props) {
+function formatCardNumber(digits: string, visible: boolean) {
+  if (!digits) return '';
+  if (visible) return groupInFours(digits);
+  if (digits.length <= 4) return digits;
+  return groupInFours('*'.repeat(digits.length - 4) + digits.slice(-4));
+}
+
+function luhnValid(digits: string) {
+  if (!/^\d{13,19}$/.test(digits)) return false;
+  let sum = 0;
+  let alternate = false;
+  for (let i = digits.length - 1; i >= 0; i -= 1) {
+    let n = Number(digits[i]);
+    if (alternate) {
+      n *= 2;
+      if (n > 9) n -= 9;
+    }
+    sum += n;
+    alternate = !alternate;
+  }
+  return sum % 10 === 0;
+}
+
+function expiryValid(month: string, year: string) {
+  const mm = Number(month);
+  const yy = Number(year.length === 2 ? `20${year}` : year);
+  if (!Number.isInteger(mm) || mm < 1 || mm > 12) return false;
+  if (!Number.isInteger(yy) || yy < 2000) return false;
+  return new Date(yy, mm, 0, 23, 59, 59) >= new Date();
+}
+
+export function AddDebitCardScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const { isDark } = useTheme();
-  const { hs, vs, fs, ms } = useResponsive();
+  const { hs, vs, fs } = useResponsive();
 
-  const [accountName, setAccountName] = useState('');
+  const [bankName, setBankName] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
-  const [cardNumber, setCardNumber] = useState('');
+  const [cardDigits, setCardDigits] = useState('');
+  const [cardVisible, setCardVisible] = useState(true);
   const [expiryMonth, setExpiryMonth] = useState('');
   const [expiryYear, setExpiryYear] = useState('');
   const [cvv, setCvv] = useState('');
+  const addCard = useAddLinkedCardMutation();
+  const saveDraft = route.params?.saveDraft;
+  const { data: banksData, isLoading: banksLoading } = useGetBanksQuery();
+  const banks = banksData?.data?.banks ?? [];
+  const selectedBank = banks.find((bank) => bank.name === bankName);
+
+  const accountQuery = useResolveAccountQuery(
+    accountNumber.length === 10 ? accountNumber : undefined,
+    selectedBank?.code
+  );
+  const bin = cardDigits.slice(0, 6);
+  const binQuery = useResolveCardBinQuery(bin.length >= 6 ? bin : undefined);
+
+  const resolvedName = accountQuery.data?.data?.account.accountName ?? '';
+  const cardMeta = binQuery.data?.data?.card;
+  const accountOk = !!resolvedName && !accountQuery.isError;
+  const cardNumberOk = luhnValid(cardDigits) && !!cardMeta && !binQuery.isError;
+  const expiryOk = expiryValid(expiryMonth, expiryYear);
 
   const bg = isDark ? '#1A1A1A' : '#FAFAFC';
-  const textPrimary = isDark ? '#FFFFFF' : '#191970';
-  const textSecondary = isDark ? '#AAAAAA' : '#858585';
-  const inputBorder = isDark ? '#4A4A8A' : '#191970';
-  const expiryInputBg = isDark ? '#1A1A1A' : '#FAFAFC';
-  const placeholderColor = 'rgba(133,133,133,0.7)';
+  const eyeColor = isDark ? '#AAAAAA' : '#858585';
   const disclaimerColor = isDark ? '#AAAAAA' : '#858585';
+  const hintColor = isDark ? '#A7F3D0' : '#047857';
+  const warnColor = isDark ? '#FCA5A5' : '#B91C1C';
+
+  const canSave =
+    !!selectedBank &&
+    accountOk &&
+    cardNumberOk &&
+    expiryOk &&
+    cvv.length >= 3;
 
   const handleSave = () => {
-    if (!accountName.trim() || !accountNumber.trim()) {
-      Alert.alert('Error', 'Please fill in all required fields.');
+    if (!canSave || !selectedBank) {
+      Alert.alert('Account not verified', 'Select a bank, use a real account number, and a valid card before saving.');
       return;
     }
-    Alert.alert('Success', 'Account details saved. This feature will be fully activated soon.', [
-      { text: 'OK', onPress: () => navigation.goBack() },
-    ]);
+
+    addCard.mutate(
+      {
+        accountName: resolvedName,
+        accountNumber,
+        bankCode: selectedBank.code,
+        cardNumber: cardDigits,
+        expiryMonth,
+        expiryYear,
+      },
+      {
+        onSuccess: (data) => {
+          if (saveDraft) {
+            navigation.replace('SavePleaseWait', {
+              ...saveDraft,
+              sourceType: 'LINKED_ACCOUNT',
+              linkedAccountId: data.data?.card._id,
+            });
+            return;
+          }
+          Alert.alert('Success', 'Account linked successfully.', [
+            { text: 'OK', onPress: () => navigation.goBack() },
+          ]);
+        },
+        onError: (err) => {
+          Alert.alert(
+            'Could not save account',
+            getApiErrorMessage(err, 'This account or card could not be verified.')
+          );
+        },
+      }
+    );
   };
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1 }}
+      style={{ flex: 1, backgroundColor: bg }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <View style={[styles.container, { backgroundColor: bg, paddingTop: insets.top }]}>
-        {/* Header */}
-        <View style={[styles.header, { paddingHorizontal: hs(21), paddingTop: vs(16) }]}>
-          <BackButton onPress={() => navigation.goBack()} />
-          <View style={styles.headerTitles}>
-            <Text style={[styles.title, { color: textPrimary, fontSize: fs(16), letterSpacing: -0.32 }]}>
-              Add Account
-            </Text>
-            <Text style={[styles.subtitle, { color: textSecondary, fontSize: fs(12) }]}>
-              Add a bank account that's linked to your BVN
-            </Text>
-          </View>
-          <View style={{ width: 22 }} />
+      <View style={{ flex: 1, paddingTop: insets.top }}>
+        <View style={{ paddingHorizontal: hs(21), paddingTop: vs(16) }}>
+          <Header
+            onBack={() => navigation.goBack()}
+            title="Add Account"
+            description="Add a bank account that's linked to your BVN"
+          />
         </View>
 
         <ScrollView
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: hs(21), paddingBottom: vs(24) }}
+          contentContainerStyle={{
+            paddingHorizontal: hs(21),
+            paddingTop: vs(24),
+            paddingBottom: vs(16),
+            gap: vs(8),
+          }}
         >
-          {/* Fields */}
-          <View style={{ marginTop: vs(16) }}>
-            <FormInputField
-              label="Account Name"
-              value={accountName}
-              onChangeText={setAccountName}
-              isDark={isDark} ms={ms} vs={vs} fs={fs} hs={hs}
-            />
-            <FormInputField
-              label="Account Number"
-              value={accountNumber}
-              onChangeText={setAccountNumber}
-              keyboardType="numeric"
-              isDark={isDark} ms={ms} vs={vs} fs={fs} hs={hs}
-            />
-            <FormInputField
-              label="Card Number"
-              value={cardNumber}
-              onChangeText={setCardNumber}
-              keyboardType="numeric"
-              secureTextEntry
-              showToggle
-              maskPrefix="**** **** **** "
-              isDark={isDark} ms={ms} vs={vs} fs={fs} hs={hs}
-            />
+          <SelectInput
+            label="Bank"
+            value={bankName}
+            placeholder={banksLoading ? 'Loading banks…' : 'Select bank'}
+            options={banks.map((bank) => bank.name)}
+            onSelect={setBankName}
+            searchable
+            searchPlaceholder="Search banks"
+          />
+          <FormInput
+            label="Account Number"
+            value={accountNumber}
+            onChangeText={(t) => setAccountNumber(digitsOnly(t, 10))}
+            keyboardType="number-pad"
+            maxLength={10}
+          />
+          {accountQuery.isFetching ? (
+            <Text style={[styles.hint, { color: disclaimerColor, fontSize: fs(10) }]}>
+              Checking this account…
+            </Text>
+          ) : accountQuery.isError ? (
+            <Text style={[styles.hint, { color: warnColor, fontSize: fs(10) }]}>
+              {getApiErrorMessage(accountQuery.error, 'This account number is not valid for the selected bank.')}
+            </Text>
+          ) : resolvedName ? (
+            <Text style={[styles.hint, { color: hintColor, fontSize: fs(10) }]}>
+              {resolvedName}
+            </Text>
+          ) : null}
+          <FormInput
+            label="Account Name"
+            value={resolvedName}
+            editable={false}
+            placeholder="Filled after the account is verified"
+          />
+          <FormInput
+            label="Card Number"
+            value={formatCardNumber(cardDigits, cardVisible)}
+            onChangeText={(text) => {
+              if (cardVisible) {
+                setCardDigits(digitsOnly(text, 19));
+                return;
+              }
+              const displayed = formatCardNumber(cardDigits, false);
+              if (text.length < displayed.length) {
+                setCardDigits(cardDigits.slice(0, -1));
+                return;
+              }
+              setCardDigits(digitsOnly(cardDigits + text.slice(displayed.length), 19));
+            }}
+            placeholder="**** **** **** 1234"
+            keyboardType="number-pad"
+            rightIcon={
+              <Pressable
+                onPress={() => setCardVisible((v) => !v)}
+                hitSlop={8}
+                style={styles.eyeBtn}
+              >
+                <Ionicons
+                  name={cardVisible ? 'eye-outline' : 'eye-off-outline'}
+                  size={16}
+                  color={eyeColor}
+                />
+              </Pressable>
+            }
+          />
+          {binQuery.isFetching ? (
+            <Text style={[styles.hint, { color: disclaimerColor, fontSize: fs(10) }]}>
+              Checking this card…
+            </Text>
+          ) : cardDigits.length >= 6 && binQuery.isError ? (
+            <Text style={[styles.hint, { color: warnColor, fontSize: fs(10) }]}>
+              {getApiErrorMessage(binQuery.error, 'This card number is not valid.')}
+            </Text>
+          ) : cardDigits.length >= 13 && !luhnValid(cardDigits) ? (
+            <Text style={[styles.hint, { color: warnColor, fontSize: fs(10) }]}>
+              This card number failed the checksum check.
+            </Text>
+          ) : cardMeta ? (
+            <Text style={[styles.hint, { color: hintColor, fontSize: fs(10) }]}>
+              {[cardMeta.brand, cardMeta.cardType, cardMeta.bank].filter(Boolean).join(' · ')}
+            </Text>
+          ) : null}
 
-            {/* Expiry Date row */}
-            <View style={{ marginBottom: vs(16) }}>
-              <Text style={[styles.fieldLabel, { color: isDark ? '#FFFFFF' : '#000000', fontSize: fs(11) }]}>
-                Expiry Date
-              </Text>
-              <View style={[styles.expiryRow, { marginTop: vs(8), gap: hs(16) }]}>
-                <View style={[
-                  styles.expiryInput,
-                  {
-                    backgroundColor: expiryInputBg,
-                    borderColor: inputBorder,
-                    borderWidth: 0.4,
-                    borderRadius: ms(12),
-                    height: vs(44),
-                    flex: 1,
-                  },
-                ]}>
-                  <TextInput
-                    value={expiryMonth}
-                    onChangeText={setExpiryMonth}
-                    placeholder="Month"
-                    placeholderTextColor={placeholderColor}
-                    keyboardType="numeric"
-                    maxLength={2}
-                    style={[styles.expiryTextInput, { color: isDark ? '#FFFFFF' : '#1A1D23', fontSize: fs(11), paddingHorizontal: hs(16), height: '100%' }]}
-                  />
-                </View>
-                <View style={[
-                  styles.expiryInput,
-                  {
-                    backgroundColor: expiryInputBg,
-                    borderColor: inputBorder,
-                    borderWidth: 0.4,
-                    borderRadius: ms(12),
-                    height: vs(44),
-                    flex: 1,
-                  },
-                ]}>
-                  <TextInput
-                    value={expiryYear}
-                    onChangeText={setExpiryYear}
-                    placeholder="Year"
-                    placeholderTextColor={placeholderColor}
-                    keyboardType="numeric"
-                    maxLength={4}
-                    style={[styles.expiryTextInput, { color: isDark ? '#FFFFFF' : '#1A1D23', fontSize: fs(11), paddingHorizontal: hs(16), height: '100%' }]}
-                  />
-                </View>
-              </View>
+          <View style={[styles.expiryRow, { gap: hs(16) }]}>
+            <View style={{ flex: 1 }}>
+              <FormInput
+                label="Expiry Date"
+                value={expiryMonth}
+                onChangeText={(t) => setExpiryMonth(digitsOnly(t, 2))}
+                placeholder="Month"
+                keyboardType="number-pad"
+                maxLength={2}
+              />
             </View>
-
-            <FormInputField
-              label="CVV"
-              value={cvv}
-              onChangeText={setCvv}
-              keyboardType="numeric"
-              secureTextEntry
-              showToggle
-              isDark={isDark} ms={ms} vs={vs} fs={fs} hs={hs}
-            />
+            <View style={{ flex: 1 }}>
+              <FormInput
+                label={' '}
+                value={expiryYear}
+                onChangeText={(t) => setExpiryYear(digitsOnly(t, 4))}
+                placeholder="Year"
+                keyboardType="number-pad"
+                maxLength={4}
+              />
+            </View>
           </View>
+          {expiryMonth.length === 2 && expiryYear.length >= 2 && !expiryOk ? (
+            <Text style={[styles.hint, { color: warnColor, fontSize: fs(10) }]}>
+              This card has expired or the date is invalid.
+            </Text>
+          ) : null}
 
-          {/* Disclaimer */}
-          <Text style={[styles.disclaimer, { color: disclaimerColor, fontSize: fs(10), textAlign: 'center' }]}>
-            The issuer of your debit card may request{'\n'}
-            that you type in your card PIN for validation. PayGenius does not have access to your card PIN and we do not store this personal information.
-          </Text>
+          <PasswordInput
+            label="CVV"
+            value={cvv}
+            onChangeText={(t) => setCvv(digitsOnly(t, 3))}
+            placeholder="123"
+            keyboardType="number-pad"
+            maxLength={3}
+          />
         </ScrollView>
 
-        {/* Save button */}
-        <View style={{ paddingHorizontal: hs(21), paddingBottom: Math.max(insets.bottom, vs(16)) }}>
-          <PrimaryButton title="Save" onPress={handleSave} />
+        <View
+          style={{
+            paddingHorizontal: hs(21),
+            paddingBottom: Math.max(insets.bottom, vs(16)),
+          }}
+        >
+          <Text
+            style={[
+              styles.disclaimer,
+              { color: disclaimerColor, fontSize: fs(10), marginBottom: vs(16) },
+            ]}
+          >
+            We confirm the account with a name enquiry and the card with a BIN check.
+            PayGenius does not store your full card number, CVV, or PIN.
+          </Text>
+          <PrimaryButton
+            title={addCard.isPending ? 'Saving...' : 'Save'}
+            onPress={handleSave}
+            disabled={!canSave || addCard.isPending}
+          />
         </View>
       </View>
     </KeyboardAvoidingView>
@@ -261,17 +323,16 @@ export function AddDebitCardScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', paddingBottom: 4 },
-  headerTitles: { flex: 1, alignItems: 'center' },
-  title: { fontWeight: '600' },
-  subtitle: { fontWeight: '400', marginTop: 2 },
-  fieldLabel: { fontWeight: '400', letterSpacing: 0.25 },
-  fieldWrap: { flexDirection: 'row', alignItems: 'center' },
-  maskPrefix: { fontWeight: '400' },
-  fieldInput: { fontWeight: '400' },
-  expiryRow: { flexDirection: 'row' },
-  expiryInput: { overflow: 'hidden' },
-  expiryTextInput: { fontWeight: '400' },
-  disclaimer: { fontWeight: '400', lineHeight: 16, marginTop: 8 },
+  expiryRow: { flexDirection: 'row', alignItems: 'flex-end' },
+  eyeBtn: { paddingHorizontal: 12, justifyContent: 'center', height: '100%' },
+  disclaimer: {
+    fontWeight: '400',
+    textAlign: 'center',
+    lineHeight: 16,
+  },
+  hint: {
+    fontWeight: '400',
+    marginTop: -4,
+    marginBottom: 4,
+  },
 });

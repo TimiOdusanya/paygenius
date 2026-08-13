@@ -27,3 +27,8 @@ export type VerifyIdentityPayload = {
 
 export type UploadSelfiePayload = { selfieImages: string[] };
 export type SetupPinPayload = { pin: string; confirmPin: string };
+
+export type UpdateProfilePayload = {
+  username?: string;
+  profilePicture?: string;
+};

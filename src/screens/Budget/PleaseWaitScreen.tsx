@@ -16,7 +16,7 @@ export function PleaseWaitScreen({ navigation, route }: Props) {
   const spinAnim = useRef(new Animated.Value(0)).current;
   const createBudgetMutation = useCreateBudgetMutation();
 
-  const { budgetName, amount, period, selectedDate, accountId } = route.params;
+  const { budgetName, amount, period, startDate, endDate, accountId } = route.params;
 
   const bg = isDark ? '#1A1A1A' : '#FAFAFC';
   const textColor = isDark ? '#FFFFFF' : '#191970';
@@ -43,8 +43,8 @@ export function PleaseWaitScreen({ navigation, route }: Props) {
         category: budgetName.toUpperCase().replace(/\s+/g, '_'),
         totalAmount: amount,
         period: period as 'WEEKLY' | 'MONTHLY',
-        startDate: selectedDate,
-        endDate: selectedDate,
+        startDate,
+        endDate,
         accountId,
       },
       {

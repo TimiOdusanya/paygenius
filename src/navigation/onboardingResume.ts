@@ -160,8 +160,8 @@ export function getResumeRoute(input: ResumeInput): {
           } as RootStackParamList['OTPVerification'],
         };
       }
-      // No phone available – fall back to the start of the registration flow
-      return { route: 'CreateAccount' };
+      // No phone available – fall back to login
+      return { route: 'Login' };
     }
 
     if (

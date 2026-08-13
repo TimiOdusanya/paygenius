@@ -16,6 +16,7 @@ import {
   uploadSelfieAPI,
   setupPinAPI,
   enableBiometricAPI,
+  updateProfileAPI,
 } from './profile.api';
 import type {
   ProfileResponse,
@@ -24,6 +25,7 @@ import type {
   UploadSelfiePayload,
   SetupPinPayload,
   CheckUsernameResponse,
+  UpdateProfilePayload,
 } from './profile.type';
 
 export function useGetProfileQuery(
@@ -133,6 +135,23 @@ export function useSetupPinMutation(
   return useMutation({
     mutationKey: PROFILE_ENDPOINTS.SETUP_PIN.MUTATION_KEY,
     mutationFn: setupPinAPI,
+    ...options,
+  });
+}
+
+export function useUpdateProfileMutation(
+  options?: Omit<
+    UseMutationOptions<
+      ApiResponse<ProfileResponse>,
+      AxiosError<unknown>,
+      UpdateProfilePayload
+    >,
+    'mutationFn'
+  >
+) {
+  return useMutation({
+    mutationKey: PROFILE_ENDPOINTS.UPDATE.MUTATION_KEY,
+    mutationFn: updateProfileAPI,
     ...options,
   });
 }

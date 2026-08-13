@@ -26,7 +26,7 @@ export function BudgetAccountSelectionScreen({ navigation, route }: Props) {
   const { isDark } = useTheme();
   const { hs, vs, fs, ms } = useResponsive();
 
-  const { budgetName, amount, period, selectedDate } = route.params;
+  const { budgetName, amount, period, startDate, endDate } = route.params;
   const [selected, setSelected] = useState<AccountType>('paygenius');
 
   const { data: walletData } = useGetWalletQuery();
@@ -55,7 +55,8 @@ export function BudgetAccountSelectionScreen({ navigation, route }: Props) {
       budgetName,
       amount,
       period,
-      selectedDate,
+      startDate,
+      endDate,
       accountId,
     });
   };

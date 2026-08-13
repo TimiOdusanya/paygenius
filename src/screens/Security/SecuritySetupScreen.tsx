@@ -7,22 +7,30 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/RootNavigator';
-import { PrimaryButton } from '@/components/PrimaryButton';
+import { FormInput } from '@/components/FormInput';
 import { Header } from '@/components/Header';
+import { PrimaryButton } from '@/components/PrimaryButton';
 import { useTheme } from '@/context/ThemeContext';
 import { useResponsive } from '@/hooks/useResponsive';
 import { useTrackOnboardingRoute } from '@/hooks/useTrackOnboardingRoute';
 import { useSetupPinMutation } from '@/services/profile/profile.query';
 import { getApiErrorMessage } from '@/utils/errors';
-import LockGlyph from '../../../assets/images/auth/lock-glyph.svg';
+import WalletKey from '../../../assets/images/security/wallet-key.svg';
+import WalletRings from '../../../assets/images/security/wallet-rings.svg';
+import FaceIdIcon from '../../../assets/images/security/faceid-icon.svg';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SecuritySetup'>;
+
+const PIN_LENGTH = 4;
+
+function digitsOnly(value: string) {
+  return value.replace(/[^0-9]/g, '').slice(0, PIN_LENGTH);
+}
 
 export function SecuritySetupScreen({ navigation }: Props) {
   useTrackOnboardingRoute('SecuritySetup');
@@ -37,16 +45,15 @@ export function SecuritySetupScreen({ navigation }: Props) {
   const setupPinMutation = useSetupPinMutation();
 
   const bg = isDark ? '#1A1A1A' : '#FAFAFC';
-  const inputBg = isDark ? '#1E1E2E' : '#FAFAFC';
-  const inputBorder = isDark ? '#3B3B3B' : '#191970';
-  const labelColor = isDark ? '#CCCCCC' : '#1A1D23';
-  const placeholderColor = isDark ? 'rgba(133,133,133,0.6)' : 'rgba(133,133,133,0.6)';
-  const linkColor = '#6D6D8C';
-  const accentColor = '#191970';
+  const linkColor = isDark ? '#CCCCCC' : '#6D6D8C';
+  const accentColor = isDark ? '#A78BFA' : '#191970';
+  const subtitleColor = isDark ? '#CCCCCC' : '#6D6D8C';
+
+  const goToBiometrics = () => navigation.navigate('BiometricSetup');
 
   const handleContinue = () => {
-    if (pin.length < 4) {
-      setError('PIN must be at least 4 digits');
+    if (pin.length < PIN_LENGTH) {
+      setError('PIN must be 4 digits');
       return;
     }
     if (pin !== confirmPin) {
@@ -69,7 +76,7 @@ export function SecuritySetupScreen({ navigation }: Props) {
     );
   };
 
-  const isValid = pin.length >= 4 && pin === confirmPin;
+  const isValid = pin.length === PIN_LENGTH && pin === confirmPin;
 
   return (
     <KeyboardAvoidingView
@@ -92,151 +99,107 @@ export function SecuritySetupScreen({ navigation }: Props) {
             onBack={() => navigation.goBack()}
             title="Secure your wallet"
             description="Create a transaction pin or use biometrics"
+            descriptionColor={subtitleColor}
           />
         </View>
 
-        {/* Key illustration */}
         <View style={[styles.iconWrap, { marginTop: vs(24) }]}>
-          {/* Outer orbit circles */}
-          <View
-            style={[
-              styles.orbitOuter,
-              {
-                width: ms(165),
-                height: ms(165),
-                borderRadius: ms(82),
-                borderColor: isDark ? 'rgba(124,58,237,0.15)' : 'rgba(213,199,247,0.4)',
-                borderWidth: 1,
-                borderStyle: 'dashed',
-                alignItems: 'center',
-                justifyContent: 'center',
-              },
-            ]}
-          >
-            <View
-              style={[
-                styles.orbitInner,
-                {
-                  width: ms(146),
-                  height: ms(146),
-                  borderRadius: ms(73),
-                  borderColor: isDark ? 'rgba(124,58,237,0.25)' : 'rgba(213,199,247,0.6)',
-                  borderWidth: 1,
-                  borderStyle: 'dashed',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: isDark ? 'rgba(175,233,220,0.1)' : 'rgba(198,240,226,0.3)',
-                },
-              ]}
-            >
-              <View
-                style={{
-                  width: ms(72),
-                  height: ms(72),
-                  borderRadius: ms(36),
-                  backgroundColor: isDark ? '#2E1A5E' : '#AFE9D6',
-                  borderWidth: 3,
-                  borderColor: isDark ? '#8855DD' : '#D8C4FA',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <LockGlyph width={ms(36)} height={ms(44)} />
-              </View>
-            </View>
+          <WalletRings width={ms(164)} height={ms(165)} />
+          <View style={styles.keyOverlay} pointerEvents="none">
+            <WalletKey width={ms(109)} height={ms(109)} />
           </View>
         </View>
 
-        {/* Enter your Pin */}
-        <View style={[styles.fieldGroup, { marginTop: vs(16), paddingHorizontal: hs(22) }]}>
-          <Text style={[styles.fieldLabel, { color: labelColor, fontSize: fs(11), letterSpacing: 0.25 }]}>
-            Enter your Pin
-          </Text>
-          <TextInput
-            style={[
-              styles.input,
-              {
-                backgroundColor: inputBg,
-                borderColor: inputBorder,
-                color: isDark ? '#FFFFFF' : '#1A1D23',
-                fontSize: fs(14),
-                height: vs(44),
-                borderRadius: ms(12),
-                marginTop: vs(8),
-                paddingHorizontal: hs(16),
-              },
-            ]}
+        <View
+          style={{
+            marginTop: vs(12),
+            paddingHorizontal: hs(21),
+            gap: vs(4),
+          }}
+        >
+          <FormInput
+            label="Enter your Pin"
             value={pin}
-            onChangeText={(v) => { setPin(v); setError(''); }}
+            onChangeText={(v) => {
+              setPin(digitsOnly(v));
+              setError('');
+            }}
             placeholder="****"
-            placeholderTextColor={placeholderColor}
             secureTextEntry
-            keyboardType="numeric"
-            maxLength={10}
+            keyboardType="number-pad"
+            maxLength={PIN_LENGTH}
+            textContentType="oneTimeCode"
           />
-        </View>
-
-        {/* Enter your Pin again */}
-        <View style={[styles.fieldGroup, { marginTop: vs(8), paddingHorizontal: hs(22) }]}>
-          <Text style={[styles.fieldLabel, { color: labelColor, fontSize: fs(11), letterSpacing: 0.25 }]}>
-            Enter your Pin again
-          </Text>
-          <TextInput
-            style={[
-              styles.input,
-              {
-                backgroundColor: inputBg,
-                borderColor: error ? '#FF4D4F' : inputBorder,
-                color: isDark ? '#FFFFFF' : '#1A1D23',
-                fontSize: fs(14),
-                height: vs(44),
-                borderRadius: ms(12),
-                marginTop: vs(8),
-                paddingHorizontal: hs(16),
-              },
-            ]}
+          <FormInput
+            label="Enter your Pin again"
             value={confirmPin}
-            onChangeText={(v) => { setConfirmPin(v); setError(''); }}
+            onChangeText={(v) => {
+              setConfirmPin(digitsOnly(v));
+              setError('');
+            }}
             placeholder="****"
-            placeholderTextColor={placeholderColor}
             secureTextEntry
-            keyboardType="numeric"
-            maxLength={10}
+            keyboardType="number-pad"
+            maxLength={PIN_LENGTH}
+            textContentType="oneTimeCode"
           />
         </View>
 
         {error ? (
-          <Text style={[styles.errorText, { color: '#FF4D4F', fontSize: fs(11), marginTop: vs(4), paddingHorizontal: hs(22) }]}>
+          <Text
+            style={[
+              styles.errorText,
+              {
+                color: '#FF4D4F',
+                fontSize: fs(11),
+                marginTop: vs(4),
+                paddingHorizontal: hs(21),
+              },
+            ]}
+          >
             {error}
           </Text>
         ) : null}
 
-        {/* Biometric links */}
-        <View style={[styles.biometricLinks, { marginTop: vs(12) }]}>
-          <Pressable onPress={() => navigation.navigate('BiometricSetup')}>
+        <View style={[styles.biometricLinks, { marginTop: vs(28) }]}>
+          <Pressable onPress={goToBiometrics} hitSlop={8}>
             <Text style={[styles.biometricText, { fontSize: fs(12), color: linkColor }]}>
               Click here to{' '}
-              <Text style={{ color: accentColor, fontWeight: '500' }}>Set Biometrics</Text>
+              <Text style={{ color: accentColor }}>Set Biometrics</Text>
             </Text>
           </Pressable>
-          <View style={{ marginTop: vs(8) }}>
+          <Pressable
+            onPress={goToBiometrics}
+            hitSlop={8}
+            style={{ marginTop: vs(20) }}
+          >
             <Text style={[styles.biometricText, { fontSize: fs(12), color: linkColor }]}>
-              Or{' '}
-              <Text style={{ color: accentColor, fontWeight: '500' }}>Face ID</Text>
+              Or <Text style={{ color: accentColor }}>Face ID</Text>
             </Text>
-          </View>
-          <View style={[styles.faceIdIcon, { marginTop: vs(8), backgroundColor: isDark ? '#2A1A4A' : '#EDE8FF', borderRadius: ms(8), padding: ms(8) }]}>
-            <Text style={{ fontSize: ms(20) }}>🪪</Text>
-          </View>
+          </Pressable>
+          <Pressable
+            onPress={goToBiometrics}
+            style={{ marginTop: vs(12) }}
+            hitSlop={8}
+          >
+            <FaceIdIcon width={ms(31)} height={ms(31)} />
+          </Pressable>
         </View>
 
-        {/* Footer */}
-        <View style={[styles.footer, { paddingHorizontal: hs(21), marginTop: vs(24) }]}>
-            <PrimaryButton
-                title={setupPinMutation.isPending ? 'Setting up...' : 'Continue'}
-                onPress={handleContinue}
-                disabled={!isValid || setupPinMutation.isPending}
-                style={!isValid ? { opacity: 0.6 } : undefined}
+        <View
+          style={[
+            styles.footer,
+            {
+              paddingHorizontal: hs(21),
+              paddingTop: vs(24),
+            },
+          ]}
+        >
+          <PrimaryButton
+            title={setupPinMutation.isPending ? 'Setting up...' : 'Continue'}
+            onPress={handleContinue}
+            disabled={!isValid || setupPinMutation.isPending}
+            style={!isValid ? { opacity: 0.6 } : undefined}
           />
         </View>
       </ScrollView>
@@ -246,18 +209,17 @@ export function SecuritySetupScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   scroll: { flexGrow: 1 },
-  iconWrap: { alignItems: 'center' },
-  orbitOuter: {},
-  orbitInner: {},
-  fieldGroup: {},
-  fieldLabel: { fontWeight: '400' },
-  input: {
-    borderWidth: 0.4,
-    fontWeight: '400',
+  iconWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  keyOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   errorText: { fontWeight: '400' },
   biometricLinks: { alignItems: 'center' },
   biometricText: { fontWeight: '400', textAlign: 'center' },
-  faceIdIcon: { alignItems: 'center', justifyContent: 'center' },
-  footer: {},
+  footer: { marginTop: 'auto' },
 });
