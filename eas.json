@@ -14,7 +14,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "http://172.20.10.4:8000",
+        "EXPO_PUBLIC_API_URL": "https://paygenius-backend-y5u1.onrender.com",
         "EXPO_PUBLIC_GOOGLE_CLIENT_ID": "193239965412-tjkqns5tgap0dq7qd4eda0734msbdue6.apps.googleusercontent.com"
       }
     },

@@ -5,8 +5,7 @@ const getBaseUrl = (): string => {
   if (typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_API_URL) {
     return process.env.EXPO_PUBLIC_API_URL;
   }
-  // Fallback: use your Mac's LAN IP when env is missing
-  return 'http://172.20.10.4:8000';
+  return 'https://paygenius-backend-y5u1.onrender.com';
 };
 
 export const BASE_URL = getBaseUrl();
