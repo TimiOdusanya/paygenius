@@ -44,6 +44,7 @@ module.exports = {
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
       package: 'com.paygenius.app',
+      allowBackup: false,
     },
     web: {
       favicon: './assets/favicon.png',
@@ -55,6 +56,7 @@ module.exports = {
     },
     scheme: 'paygenius',
     plugins: [
+      './plugins/withDisableAndroidBackup',
       'expo-font',
       'expo-system-ui',
       [
