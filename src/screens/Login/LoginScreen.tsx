@@ -129,7 +129,7 @@ export function LoginScreen({ navigation }: Props) {
       >
         <View style={[styles.inner, { paddingHorizontal: hs(21) }]}>
           <Header
-            onBack={() => navigation.goBack()}
+            onBack={() => navigation.navigate('RegionSelector')}
             title="Welcome back"
             description="Sign in to continue"
           />
